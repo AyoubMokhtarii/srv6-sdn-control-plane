@@ -116,6 +116,9 @@ class SRv6Manager:
                 ip_address, grpc_client_credentials
             )
         else:
+            logging.info('_____ ip_address: %s' % ip_address)
+            logging.info('_____ port: %s' % port)
+
             channel = grpc.insecure_channel(ip_address)
 
         return (srv6_manager_pb2_grpc.SRv6ManagerStub(channel), channel)
@@ -857,6 +860,12 @@ class SRv6Manager:
             srv6_stub, channel = self.get_grpc_session(
                 server_ip, server_port
             )
+
+            logging.info('\n\n&&&&&&&&&&& stub : %s', srv6_stub)
+            logging.info('\n\n&&&&&&&&&&& channel : %s', channel)
+
+            
+
             # Remove IP Address
             response = srv6_stub.Remove(srv6_request)
             # Create the response

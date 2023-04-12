@@ -82,6 +82,9 @@ DEFAULT_USE_MGMT_IP = False
 
 # Default server ip and port
 DEFAULT_GRPC_SERVER_IP = '::'
+# DEFAULT_GRPC_SERVER_IP = '177.0.120.58'
+
+
 DEFAULT_GRPC_SERVER_PORT = 54321
 DEFAULT_GRPC_CLIENT_PORT = 12345
 # Secure option
@@ -317,7 +320,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
             status=Status(code=STATUS_OK, reason='OK')
         )
 
-    """ Enable a device """
+    """ Disable a device """
 
     def DisableDevice(self, request, context):
         logging.debug('DisableDevice request received: %s' % request)
@@ -490,6 +493,9 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                 # Validate the interfaces
                 wan_interfaces_counter = 0
                 lan_interfaces_counter = 0
+
+                
+
                 for interface in interfaces:
                     # Update counters
                     if interface.type == InterfaceType.WAN:
@@ -741,6 +747,35 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                 tenantid = device.tenantid
                 # Extract the device interfaces from the configuration
                 interfaces = devices[deviceid]['interfaces']
+
+
+
+                #FIXME remove this just logging device configuration request
+                logging.info('**************************  device configuration request  **********************************')
+                logging.info('deviceid: %s\n' % deviceid)
+                logging.info('device_name: %s\n' % device_name)
+                logging.info('device_description: %s\n' % device_description)
+                logging.info('tenantid: %s\n' % tenantid)
+                logging.info('interfaces: %s\n' % interfaces)
+                logging.info('device.interfaces: %s\n' % device.interfaces)
+                logging.info('************************************************************')
+
+
+
+                # #FIXME remove this ... just checking if the sb connection is working
+                # logging.info('\n\n************************** Checking Sb interface connection ****************************')
+                # # logging.info('*** Trying shutdown the device ***')
+                # dvc = storage_helper.get_devices(deviceids=[deviceid])
+                # dvc = dvc[0]
+                # logging.info(' \n\n*** device[mgmtip] *** %s', dvc['mgmtip'])
+                # logging.info('*** grpc_client_port *** %s \n\n', self.grpc_client_port)
+                # # response = self.srv6_manager.shutdown_device(server_ip=dvc['mgmtip'], server_port=self.grpc_client_port)
+                # response = self.srv6_manager.shutdown_device(server_ip='10.0.12.33', server_port=self.grpc_client_port)        
+                # logging.info('\n\n**************************Sleeping 100 sec ****************************')
+                # time.sleep(100)
+
+
+
                 err = STATUS_OK
                 for interface in device.interfaces:
                     interfaces[interface.name]['name'] = interface.name
@@ -758,12 +793,25 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                                 'Cannot set subnets for a WAN interface'
                             )
                     else:
+
+
                         if len(interface.ipv4_addrs) > 0:
                             addrs = list()
                             for addr in interfaces[
                                 interface.name
                             ]['ipv4_addrs']:
                                 addrs.append(addr)
+
+
+                                #FIXME remove this... just logging 
+                                logging.info("\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+                                logging.info("devices[deviceid]['mgmtip']: %s", devices[deviceid]['mgmtip'])
+                                logging.info("self.grpc_client_port : %s", self.grpc_client_port)
+                                logging.info("ip_addr: %s", addr)
+                                logging.info("device: %s", interface.name,)
+                                logging.info("family: %s", AF_UNSPEC)
+                                logging.info("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
+
                                 response = self.srv6_manager.remove_ipaddr(
                                     devices[deviceid]['mgmtip'],
                                     self.grpc_client_port,
@@ -1775,7 +1823,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                 ):
                     err = (
                         'Cannot establish a full-mesh between all the WAN '
-                        'interfaces'
+                        'interfaces - 1'
                     )
                     logging.error(err)
                     return OverlayServiceReply(
@@ -2778,7 +2826,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                 ):
                     err = (
                         'Cannot establish a full-mesh between all the WAN '
-                        'interfaces'
+                        'interfaces - 2'
                     )
                     logging.error(err)
                     return OverlayServiceReply(

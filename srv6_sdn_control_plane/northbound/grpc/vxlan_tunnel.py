@@ -159,12 +159,8 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
         # get VTEP name
         vtep_name = 'vxlan-%s' % (vni)
         # get WAN interface name for local site and remote site
-        wan_intf_local_site = storage_helper.get_wan_interfaces(
-            id_local_site, tenantid
-        )[0]
-        wan_intf_remote_site = storage_helper.get_wan_interfaces(
-            id_remote_site, tenantid
-        )[0]
+        wan_intf_local_site = storage_helper.get_wan_interfaces(id_local_site, tenantid)[0]
+        wan_intf_remote_site = storage_helper.get_wan_interfaces(id_remote_site, tenantid)[0]
         # transport protocol
         transport_proto = storage_helper.get_overlay(
             overlayid=overlayid, tenantid=tenantid

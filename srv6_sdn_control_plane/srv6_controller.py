@@ -961,6 +961,24 @@ class SRv6Controller(object):
                         server_certificate, sb_secure, client_certificate,
                         southbound_interface, topo_graph, vpn_dict, devices,
                         vpn_file, controller_state, verbose):
+        
+        
+        if verbose:
+            logging.info('grpc_server_ip : %s' % grpc_server_ip)
+            logging.info('grpc_server_port : %s' % grpc_server_port)
+            logging.info('grpc_client_port : %s' % grpc_client_port)
+            logging.info('nb_secure : %s' % nb_secure)
+            logging.info('server_key : %s' % server_key)
+            logging.info('server_certificate : %s' % server_certificate)
+            logging.info('sb_secure : %s' % sb_secure)
+            logging.info('client_certificate : %s' % client_certificate)
+            logging.info('southbound_interface : %s' % southbound_interface)
+            logging.info('vpn_dict : %s' % vpn_dict)
+            logging.info('devices : %s' % devices)
+            logging.info('vpn_file : %s' % vpn_file)
+            logging.info('controller_state : %s' % controller_state)
+            logging.info('verbose : %s' % verbose)
+        
         nb_server, nb_interface_ref = nb_grpc_server.create_server(
             grpc_server_ip=grpc_server_ip,
             grpc_server_port=grpc_server_port,
@@ -978,9 +996,12 @@ class SRv6Controller(object):
             controller_state=controller_state,
             verbose=verbose
         )
+
         self.nb_interface_ref = nb_interface_ref
+        
         # Start the loop for gRPC
-        logging.info('Listening gRPC')
+        logging.info('***$$$$$$$$$$$$$$ Listening gRPC ')
+    
         nb_server.start()
         while True:
             time.sleep(5)
@@ -1460,6 +1481,10 @@ def _main():
             'Supported northbound interfaces: %s' %
             (nb_interface, SUPPORTED_NB_INTERFACES)
         )
+    
+    
+    logging.info('++++pymerang server ip: %s', pymerang_server_ip)
+
     # Create a new SRv6 controller
     srv6_controller = SRv6Controller(
         nodes=nodes,
