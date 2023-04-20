@@ -110,6 +110,19 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
         # get devices ID
         id_remote_site = r_slice['deviceid']
         id_local_site = l_slice['deviceid']
+
+
+        # FIXME remove logging ------------------------------
+        logging.info("RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR")
+        logging.info(r_slice)
+        logging.info(l_slice)
+        logging.info("RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR")
+        # ------------------------------
+
+
+
+
+
         # get management IP address for local and remote site
         mgmt_ip_local_site = storage_helper.get_router_mgmtip(
             l_slice['deviceid'], tenantid
@@ -117,6 +130,19 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
         mgmt_ip_remote_site = storage_helper.get_router_mgmtip(
             r_slice['deviceid'], tenantid
         )
+
+
+        # FIXME remove logging ------------------------------
+        logging.info("\n\n11111111111111111111111111111111")
+        logging.info("mgmt_ip_local_site")
+        logging.info(mgmt_ip_local_site)
+        logging.info("mgmt_ip_remote_site")
+        logging.info(mgmt_ip_remote_site)
+        logging.info("11111111111111111111111111111111\n\n")
+        # ---------------------------------------------------
+
+
+
         # get subnet for local and remote site
         lan_sub_remote_sites = storage_helper.get_ip_subnets(
             id_remote_site, tenantid, r_slice['interface_name']
@@ -165,6 +191,32 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
         transport_proto = storage_helper.get_overlay(
             overlayid=overlayid, tenantid=tenantid
         )['transport_proto']
+
+
+
+
+        # FIXME remove logging ------------------------------
+        logging.info("\n\n2222222222222222222222222222")
+        logging.info("lan_sub_remote_sites")
+        logging.info(lan_sub_remote_sites)
+        logging.info("lan_sub_local_sites")
+        logging.info(lan_sub_local_sites)
+        logging.info("tableid")
+        logging.info(tableid)
+        logging.info("transport_proto")
+        logging.info(transport_proto)
+        logging.info("vni")
+        logging.info(vni)
+        logging.info("vtep_name")
+        logging.info(vtep_name)
+        logging.info("wan_intf_local_site")
+        logging.info(wan_intf_local_site)
+        logging.info("wan_intf_remote_site")
+        logging.info(wan_intf_remote_site)
+        logging.info("2222222222222222222222222222\n\n")
+        # ---------------------------------------------------
+
+
         # get external IP address for loal site and remote site
         if transport_proto == 'ipv6':
             wan_ip_local_site = storage_helper.get_ext_ipv6_addresses(
@@ -185,6 +237,19 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
         # DB key creation, one per tunnel direction
         key_local_to_remote = '%s-%s' % (id_local_site, id_remote_site)
         key_remote_to_local = '%s-%s' % (id_remote_site, id_local_site)
+
+
+        # FIXME remove logging ------------------------------
+        logging.info("\n\n3333333333333333333333333333333")
+        logging.info("key_local_to_remote")
+        logging.info(key_local_to_remote)
+        logging.info("key_remote_to_local")
+        logging.info(key_remote_to_local)
+        logging.info("\n\n3333333333333333333333333333333")
+        # ---------------------------------------------------
+
+
+
         # get tunnel dictionaries from DB
         dictionary_local = self.overlays.find_one(
             {
@@ -206,6 +271,20 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
                 'created_tunnel.$.tunnel_key': 1
             }
         )
+
+
+        # FIXME remove logging ------------------------------
+        logging.info("\n\n444444444444444444444444444444444444444444")
+        logging.info("dictionary_local")
+        logging.info(dictionary_local)
+        logging.info("dictionary_remote")
+        logging.info(dictionary_remote)
+        logging.info("\n\n444444444444444444444444444444444444444444")
+        # ---------------------------------------------------
+
+
+
+
         # If it's the first overlay for the devices, create dictionaries
         # else take tunnel info from DB dictionaries
         #
@@ -227,6 +306,10 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
             }
         else:
             tunnel_remote = dictionary_remote['created_tunnel'][0]
+        
+        
+        
+        
         # Check if there is the fdb entry in local site for remote site
         if tunnel_local.get('fdb_entry_config') is False:
             # add FDB entry in local site
@@ -247,6 +330,12 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
                 return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
             # update local dictionary
             tunnel_local['fdb_entry_config'] = True
+
+
+
+
+
+            
         # Check if there is the fdb entry in remote site for local site
         if tunnel_remote.get('fdb_entry_config') is False:
             # add FDB entry in remote site

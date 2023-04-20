@@ -761,21 +761,6 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                 logging.info('************************************************************')
 
 
-
-                # #FIXME remove this ... just checking if the sb connection is working
-                # logging.info('\n\n************************** Checking Sb interface connection ****************************')
-                # # logging.info('*** Trying shutdown the device ***')
-                # dvc = storage_helper.get_devices(deviceids=[deviceid])
-                # dvc = dvc[0]
-                # logging.info(' \n\n*** device[mgmtip] *** %s', dvc['mgmtip'])
-                # logging.info('*** grpc_client_port *** %s \n\n', self.grpc_client_port)
-                # # response = self.srv6_manager.shutdown_device(server_ip=dvc['mgmtip'], server_port=self.grpc_client_port)
-                # response = self.srv6_manager.shutdown_device(server_ip='10.0.12.33', server_port=self.grpc_client_port)        
-                # logging.info('\n\n**************************Sleeping 100 sec ****************************')
-                # time.sleep(100)
-
-
-
                 err = STATUS_OK
                 for interface in device.interfaces:
                     interfaces[interface.name]['name'] = interface.name
@@ -1796,17 +1781,23 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                 can_use_ipv6_addr_for_wan = True
                 can_use_ipv4_addr_for_wan = True
                 for _slice in slices:
-                    # Get WAN interface
+
+
+                    # FIXME Add static hybrid WAN
+                    # Get WAN interface 
                     wan_interface = storage_helper.get_wan_interfaces(
                         deviceid=_slice['deviceid'],
                         tenantid=tenantid
                     )[0]
+                    
+
                     # Check if WAN interface has IPv6 connectivity
                     addrs = storage_helper.get_ext_ipv6_addresses(
                         deviceid=_slice['deviceid'],
                         tenantid=tenantid,
                         interface_name=wan_interface
                     )
+
                     if addrs is None or len(addrs) == 0:
                         can_use_ipv6_addr_for_wan = False
                     # Check if WAN interface has IPv4 connectivity
@@ -1815,6 +1806,8 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                         tenantid=tenantid,
                         interface_name=wan_interface
                     )
+
+
                     if addrs is None or len(addrs) == 0:
                         can_use_ipv4_addr_for_wan = False
                 if (
