@@ -239,14 +239,14 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
         key_remote_to_local = '%s-%s' % (id_remote_site, id_local_site)
 
 
-        # FIXME remove logging ------------------------------
+        # FIXME remove logging ------------------------------------------
         logging.info("\n\n3333333333333333333333333333333")
         logging.info("key_local_to_remote")
         logging.info(key_local_to_remote)
         logging.info("key_remote_to_local")
         logging.info(key_remote_to_local)
         logging.info("\n\n3333333333333333333333333333333")
-        # ---------------------------------------------------
+        # -------------------------------------------------------------
 
 
 

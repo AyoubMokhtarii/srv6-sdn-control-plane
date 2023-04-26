@@ -34,6 +34,10 @@ import logging
 
 from srv6_sdn_control_plane import srv6_controller_utils
 
+from srv6_sdn_control_plane.srv6_controller_utils import(
+    InterfaceType
+)
+
 # Add path of proto files
 # sys.path.append(srv6_controller_utils.PROTO_FOLDER)
 
@@ -216,7 +220,7 @@ class NorthboundInterface:
     def configure_device(self, device_id, tenantid, device_name='',
                          device_description='', interfaces=[]):
         # Create the request
-        request = srv6_vpn_pb2.ConfigureDeviceRequest()
+        request = srv6_vpn_pb2.ConfigureDeviceRequest()        
         device = request.configuration.devices.add()
         device.id = device_id
         device.name = device_name
@@ -263,6 +267,14 @@ class NorthboundInterface:
                         subnet.gateway = _subnet['gateway']
             if 'type' in _interface:
                 interface.type = _interface['type']
+                interface.underlay_wan_id = ""
+                if (_interface['type'] == InterfaceType.WAN):
+                    interface.underlay_wan_id = _interface['underlay_wan_id']
+                    # # FIXME remove this just logging-------------------------------------------------
+                    # print(" ++++++++++++++++ WAN interface : " )
+                    # print(interface)
+                    # # print(interface)
+                    # #-------------------------------------------------
         try:
             # Get the reference of the stub
             srv6_vpn_stub, channel = self.get_grpc_session(
@@ -484,6 +496,8 @@ class NorthboundInterface:
             interface = intent.slices.add()
             interface.deviceid = text_type(intf[0])
             interface.interface_name = text_type(intf[1])
+            interface.underlay_wan_id = text_type(intf[2])
+
         try:
             # Get the reference of the stub
             srv6_stub, channel = self.get_grpc_session(

@@ -297,6 +297,22 @@ def validate_interface_type(interface_type):
     return interface_type in supported_interface_types
 
 
+
+def validate_underlay_wan_id(underlay_wan_id):
+    '''
+    Utiliy function to validate the underlay WAN ID (i.e. to index the infrastructure underlay network).
+    This index (ID) is used to identify the Edge Devices's interfaces that are in the same underlay WAN.
+
+    : underlay_wan_id : string 
+    : return : boolean (True if valid, False otherwise)
+
+    '''
+    valid = False
+    if isinstance(underlay_wan_id, str):
+        if underlay_wan_id != '':
+            valid = True
+    return valid
+
 # Utiliy function to check if the IP
 # is a valid IPv6 address
 def validate_ipv6_address(ip):
