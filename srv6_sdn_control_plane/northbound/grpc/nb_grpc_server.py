@@ -1838,7 +1838,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                             )
                 
                 
-                
+                # Checkin overlapping subnets of diffrent slices lan interfaces
                 for slice1 in slices:
                     # Extract the device ID
                     deviceid_1 = slice1['deviceid']
@@ -1914,8 +1914,13 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                                                 reason=err
                                             )
                                         )
+                                    
+
+
                 can_use_ipv6_addr_for_wan = True
                 can_use_ipv4_addr_for_wan = True
+                
+                
                 for _slice in slices:
 
 
@@ -1931,43 +1936,47 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                     addrs = storage_helper.get_ext_ipv6_addresses(
                         deviceid=_slice['deviceid'],
                         tenantid=tenantid,
-                        interface_name=wan_interface
-                    )
-
+                        interface_name=wan_interface)
                     if addrs is None or len(addrs) == 0:
                         can_use_ipv6_addr_for_wan = False
+                    
+                    
                     # Check if WAN interface has IPv4 connectivity
                     addrs = storage_helper.get_ext_ipv4_addresses(
                         deviceid=_slice['deviceid'],
                         tenantid=tenantid,
-                        interface_name=wan_interface
-                    )
-
-
+                        interface_name=wan_interface)
                     if addrs is None or len(addrs) == 0:
                         can_use_ipv4_addr_for_wan = False
-                if (
-                    not can_use_ipv6_addr_for_wan
-                    and not can_use_ipv4_addr_for_wan
-                ):
+
+
+
+                if (not can_use_ipv6_addr_for_wan
+                    and not can_use_ipv4_addr_for_wan):
                     err = (
                         'Cannot establish a full-mesh between all the WAN '
-                        'interfaces - 1'
-                    )
+                        'interfaces - 1')
+                    
                     logging.error(err)
                     return OverlayServiceReply(
                         status=Status(code=STATUS_BAD_REQUEST, reason=err))
+                
+                
                 if tunnel_name == 'SRv6' and not can_use_ipv6_addr_for_wan:
                     err = (
                         'IPv6 transport not available: cannot create a SRv6 '
-                        'overlay'
-                    )
+                        'overlay')
+                    
                     logging.error(err)
-                    return OverlayServiceReply(
-                        status=Status(code=STATUS_BAD_REQUEST, reason=err))
+                    return OverlayServiceReply(status=Status(code=STATUS_BAD_REQUEST, reason=err))
+                
+                
+                # FIXME why prioritize IPv6 over IPv4?
                 transport_proto = 'ipv4'
                 if can_use_ipv6_addr_for_wan:
                     transport_proto = 'ipv6'
+                
+                
                 # For SRv6 overlays, Segment Routing transparency must be T0
                 # or T1 for each device, otherwise the SRv6 full-mesh overlay
                 # cannot be created
@@ -2030,6 +2039,8 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                         #             reason=err
                         #         )
                         #     )
+                
+                
                 # All the devices must belong to the same tenant
                 for device in devices.values():
                     if device['tenantid'] != tenantid:
@@ -2037,11 +2048,11 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                             'Error while processing the intent: '
                             'All the devices must belong to the '
                             'same tenant %s' % tenantid
-                        )
+                            )
                         logging.warning(err)
-                        return OverlayServiceReply(
-                            status=Status(code=STATUS_BAD_REQUEST, reason=err)
-                        )
+                        return OverlayServiceReply(status=Status(code=STATUS_BAD_REQUEST, reason=err))
+                
+                
                 logging.info('All checks passed')
                 # All checks passed
                 #
@@ -2063,14 +2074,18 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                             reason=err
                         )
                     )
+                
                 # Add reverse action to the rollback stack
                 rollback.push(
                     func=storage_helper.remove_overlay,
                     overlayid=overlayid,
                     tenantid=tenantid
                 )
+
                 # Get tunnel mode
                 tunnel_mode = self.tunnel_modes[tunnel_name]
+
+
                 # Let's create the overlay
                 # Create overlay data structure
                 status_code = tunnel_mode.init_overlay_data(
@@ -2099,6 +2114,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                     tenantid=tenantid,
                     overlay_info=tunnel_info
                 )
+                
                 # Iterate on slices and add to the overlay
                 configured_slices = list()
                 for site1 in slices:
@@ -2241,6 +2257,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                         tenantid=tenantid,
                         overlay_info=tunnel_info
                     )
+                    
                     # Create the tunnel between all the pairs of interfaces
                     for site2 in configured_slices:
                         if site1['deviceid'] != site2['deviceid']:
@@ -2985,7 +3002,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                         deviceid=_slice['deviceid'],
                         tenantid=tenantid
                     )[0]
-                    
+
                     # Check if WAN interface has IPv6 connectivity
                     addrs = storage_helper.get_ext_ipv6_addresses(
                         deviceid=_slice['deviceid'],

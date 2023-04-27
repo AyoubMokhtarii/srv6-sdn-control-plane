@@ -184,6 +184,8 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
         vni = storage_helper.get_vni(overlay_name, tenantid)
         # get VTEP name
         vtep_name = 'vxlan-%s' % (vni)
+
+        # TODO Add support for multiple WAN interfaces (hybrid WAN)
         # get WAN interface name for local site and remote site
         wan_intf_local_site = storage_helper.get_wan_interfaces(id_local_site, tenantid)[0]
         wan_intf_remote_site = storage_helper.get_wan_interfaces(id_remote_site, tenantid)[0]
@@ -219,19 +221,11 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
 
         # get external IP address for loal site and remote site
         if transport_proto == 'ipv6':
-            wan_ip_local_site = storage_helper.get_ext_ipv6_addresses(
-                id_local_site, tenantid, wan_intf_local_site
-            )[0].split("/")[0]
-            wan_ip_remote_site = storage_helper.get_ext_ipv6_addresses(
-                id_remote_site, tenantid, wan_intf_remote_site
-            )[0].split("/")[0]
+            wan_ip_local_site = storage_helper.get_ext_ipv6_addresses(id_local_site, tenantid, wan_intf_local_site)[0].split("/")[0]
+            wan_ip_remote_site = storage_helper.get_ext_ipv6_addresses(id_remote_site, tenantid, wan_intf_remote_site)[0].split("/")[0]
         elif transport_proto == 'ipv4':
-            wan_ip_local_site = storage_helper.get_ext_ipv4_addresses(
-                id_local_site, tenantid, wan_intf_local_site
-            )[0].split("/")[0]
-            wan_ip_remote_site = storage_helper.get_ext_ipv4_addresses(
-                id_remote_site, tenantid, wan_intf_remote_site
-            )[0].split("/")[0]
+            wan_ip_local_site = storage_helper.get_ext_ipv4_addresses(id_local_site, tenantid, wan_intf_local_site)[0].split("/")[0]
+            wan_ip_remote_site = storage_helper.get_ext_ipv4_addresses(id_remote_site, tenantid, wan_intf_remote_site)[0].split("/")[0]
         else:
             return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
         # DB key creation, one per tunnel direction
@@ -508,10 +502,11 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
             )
         # get VRF name
         vrf_name = 'vrf-%s' % (tableid)
+        
         # get WAN interface
-        wan_intf_site = storage_helper.get_wan_interfaces(
-            deviceid, tenantid
-        )[0]
+        # TODO Add support for multiple WAN interfaces (hybrid WAN)
+        wan_intf_site = storage_helper.get_wan_interfaces(deviceid, tenantid)[0]
+        
         # get VNI for the overlay
         vni = storage_helper.get_vni(overlay_name, tenantid)
         # get VTEP name
@@ -729,13 +724,13 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
         mgmt_ip_local_site = storage_helper.get_router_mgmtip(
             id_local_site, tenantid
         )
+
         # get WAN interface name for local site and remote site
-        wan_intf_local_site = storage_helper.get_wan_interfaces(
-            id_local_site, tenantid
-        )[0]
-        wan_intf_remote_site = storage_helper.get_wan_interfaces(
-            id_remote_site, tenantid
-        )[0]
+        # TODO Add support for multiple WAN interfaces (hybrid WAN)
+        wan_intf_local_site = storage_helper.get_wan_interfaces(id_local_site, tenantid)[0]
+        wan_intf_remote_site = storage_helper.get_wan_interfaces(id_remote_site, tenantid)[0]
+
+
         # transport protocol
         transport_proto = storage_helper.get_overlay(
             overlayid=overlayid, tenantid=tenantid
@@ -1270,10 +1265,11 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
         vni = storage_helper.get_vni(overlay_name, tenantid)
         # get VTEP name
         vtep_name = 'vxlan-%s' % (vni)
+
         # get WAN interface name for local site and remote site
-        wan_intf_remote_site = storage_helper.get_wan_interfaces(
-            id_remote_site, tenantid
-        )[0]
+        # TODO Add support for multiple WAN interfaces (hybrid WAN)
+        wan_intf_remote_site = storage_helper.get_wan_interfaces(id_remote_site, tenantid)[0]
+
         # transport protocol
         transport_proto = storage_helper.get_overlay(
             overlayid=overlayid, tenantid=tenantid
@@ -1436,10 +1432,11 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
             )
         # get VRF name
         vrf_name = 'vrf-%s' % (tableid)
+        
         # get WAN interface
-        wan_intf_site = storage_helper.get_wan_interfaces(
-            deviceid, tenantid
-        )[0]
+        # TODO Add support for multiple WAN interfaces (hybrid WAN)
+        wan_intf_site = storage_helper.get_wan_interfaces(deviceid, tenantid)[0]
+
         # get VNI for the overlay
         vni = storage_helper.get_vni(overlay_name, tenantid)
         # get VTEP name
