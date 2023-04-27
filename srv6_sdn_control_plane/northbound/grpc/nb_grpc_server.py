@@ -1710,7 +1710,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                     
 
                     # Check if the underlay WAN interface exists in the device (deviceid) 
-                    # i.e The device (deviceid) with the LAN interface (interface_name) NEED to have the underlay WAN interface (underlay_wan_id)
+                    # i.e The device (deviceid) with the LAN interface (lan_interface_name) MUST have the underlay WAN interface (underlay_wan_id)
                     # NB : slice is a tuple (deviceid, interface_name, underlay_WAN_id)
                     #
                     underlay_wan_interface_found = False
@@ -1739,10 +1739,11 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                         logging.warning(err)
                         return OverlayServiceReply(status=Status(code=STATUS_BAD_REQUEST, reason=err))
                     
+
+                
+
                     # Check if the slice is already assigned to an overlay
-                    _overlay = storage_helper.get_overlay_containing_slice(
-                        _slice, tenantid
-                    )
+                    _overlay = storage_helper.get_overlay_containing_slice(_slice, tenantid)
                     if _overlay is not None:
                         # Slice already assigned to an overlay
                         err = (
@@ -1754,6 +1755,8 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                         return OverlayServiceReply(
                             status=Status(code=STATUS_BAD_REQUEST, reason=err)
                         )
+                    
+                    
                     # Check for IP addresses
                     if overlay_type == OverlayType.IPv4Overlay:
                         addrs = storage_helper.get_ipv4_addresses(
@@ -1848,6 +1851,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                         deviceid_2 = slice2['deviceid']
                         # Extract the interface name
                         interface_name_2 = slice2['interface_name']
+
                         if overlay_type == OverlayType.IPv4Overlay:
                             subnets1 = storage_helper.get_ipv4_subnets(
                                 deviceid=deviceid_1,
@@ -2974,11 +2978,14 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                 can_use_ipv6_addr_for_wan = True
                 can_use_ipv4_addr_for_wan = True
                 for _slice in slices + incoming_slices:
+
+                    # TODO Add support for multiple WAN interfaces (hybrid WAN)
                     # Get WAN interface
                     wan_interface = storage_helper.get_wan_interfaces(
                         deviceid=_slice['deviceid'],
                         tenantid=tenantid
                     )[0]
+                    
                     # Check if WAN interface has IPv6 connectivity
                     addrs = storage_helper.get_ext_ipv6_addresses(
                         deviceid=_slice['deviceid'],

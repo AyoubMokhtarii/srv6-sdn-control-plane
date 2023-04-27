@@ -276,7 +276,12 @@ class SRv6Tunnel(tunnel_mode.TunnelMode):
                     # Cannot get WAN interface
                     logger.warning('Cannot get WAN interface')
                     return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+                
+
+                # TODO Add support for multiple WAN interfaces (hybrid WAN)
                 wan_interface = wan_interfaces[0]
+
+
                 # Get an IPv6 address
                 addrs = storage_helper.get_ipv6_addresses(
                     deviceid=l_slice['deviceid'],
@@ -492,7 +497,10 @@ class SRv6Tunnel(tunnel_mode.TunnelMode):
                         # Cannot get WAN interface
                         logger.warning('Cannot get WAN interface')
                         return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+                    
+                    # TODO Add support for multiple WAN interfaces (hybrid WAN)
                     wan_interface = wan_interfaces[0]
+                    
                     # Get an IPv6 address
                     addrs = storage_helper.get_ipv6_addresses(
                         deviceid=l_slice['deviceid'], tenantid=tenantid,
@@ -1204,7 +1212,10 @@ class SRv6Tunnel(tunnel_mode.TunnelMode):
                     # Cannot get WAN interface
                     logger.warning('Cannot get WAN interface')
                     return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+                
+                # TODO Add support for multiple WAN interfaces (hybrid WAN)
                 wan_interface = wan_interfaces[0]
+
                 # Get an IPv6 address
                 addrs = storage_helper.get_ipv6_addresses(
                     deviceid=l_slice['deviceid'],
@@ -1516,7 +1527,11 @@ class SRv6Tunnel(tunnel_mode.TunnelMode):
                         # Cannot get WAN interface
                         logger.warning('Cannot get WAN interface')
                         return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+                    
+                    # TODO Add support for multiple WAN interfaces (hybrid WAN)
                     wan_interface = wan_interfaces[0]
+                    
+                    
                     # Get an IPv6 address
                     addrs = storage_helper.get_ipv6_addresses(
                         deviceid=l_slice['deviceid'],
@@ -3162,7 +3177,11 @@ class SRv6Tunnel(tunnel_mode.TunnelMode):
                     # Cannot get WAN interface
                     logger.warning('Cannot get WAN interface')
                     return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+                
+                # TODO Add support for multiple WAN interfaces (hybrid WAN)
                 wan_interface = wan_interfaces[0]
+                
+                
                 # Get an IPv6 address
                 addrs = storage_helper.get_ipv6_addresses(
                     deviceid=l_slice['deviceid'],
@@ -3299,7 +3318,11 @@ class SRv6Tunnel(tunnel_mode.TunnelMode):
                         # Cannot get WAN interface
                         logger.warning('Cannot get WAN interface')
                         return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+                    
+                    # TODO Add support for multiple WAN interfaces (hybrid WAN)
                     wan_interface = wan_interfaces[0]
+                    
+                    
                     # Get an IPv6 address
                     addrs = storage_helper.get_ipv6_addresses(
                         deviceid=l_slice['deviceid'],
@@ -3697,7 +3720,11 @@ class SRv6Tunnel(tunnel_mode.TunnelMode):
                     # Cannot get WAN interface
                     logger.warning('Cannot get WAN interface')
                     return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+                
+                # TODO Add support for multiple WAN interfaces (hybrid WAN)
                 wan_interface = wan_interfaces[0]
+                
+                
                 # Get an IPv6 address
                 addrs = storage_helper.get_ipv6_addresses(
                     deviceid=l_slice['deviceid'],
@@ -3843,7 +3870,11 @@ class SRv6Tunnel(tunnel_mode.TunnelMode):
                         # Cannot get WAN interface
                         logger.warning('Cannot get WAN interface')
                         return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+                    
+                    # TODO Add support for multiple WAN interfaces (hybrid WAN)
                     wan_interface = wan_interfaces[0]
+                    
+                    
                     # Get an IPv6 address
                     addrs = storage_helper.get_ipv6_addresses(
                         deviceid=l_slice['deviceid'],

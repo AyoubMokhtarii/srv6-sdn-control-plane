@@ -164,9 +164,9 @@ class ControllerStateSRv6:
                 sid_prefix = DEFAULT_SID_PREFIX
         else:  # public_prefix_length < 128
             # In this case we have a subnet from which we can allocate SIDs
-            wan_interface = storage_helper.get_wan_interfaces(
-                deviceid, tenantid
-            )[0]
+            # TODO Add support for multiple WAN interfaces (hybrid WAN)
+            wan_interface = storage_helper.get_wan_interfaces(deviceid, tenantid)[0]
+            
             ipv6_addrs = storage_helper.get_global_ipv6_addresses(
                 deviceid, tenantid, wan_interface
             )
@@ -204,9 +204,13 @@ class ControllerStateSRv6:
             if sid_prefix is None:
                 sid_prefix = DEFAULT_SID_PREFIX
         else:  # public_prefix_length < 128
+
+            
             # In this case we have a subnet from which we can allocate SIDs
-            wan_interface = storage_helper.get_wan_interfaces(
-                deviceid, tenantid)[0]
+            # TODO Add support for multiple WAN interfaces (hybrid WAN)
+            wan_interface = storage_helper.get_wan_interfaces(deviceid, tenantid)[0]
+            
+
             ipv6_addrs = storage_helper.get_global_ipv6_addresses(
                 deviceid, tenantid, wan_interface
             )
@@ -237,9 +241,9 @@ class ControllerStateSRv6:
             # - Public IPv6 address
             # - Decap SID (e.g. End.DT4 or End.DT6) allocated from the private
             #   range
-            wan_interface = storage_helper.get_wan_interfaces(
-                deviceid, tenantid
-            )[0]
+            # TODO Add support for multiple WAN interfaces (hybrid WAN)
+            wan_interface = storage_helper.get_wan_interfaces(deviceid, tenantid)[0]
+
             ipv6_addrs = storage_helper.get_global_ipv6_addresses(
                 deviceid, tenantid, wan_interface
             )
