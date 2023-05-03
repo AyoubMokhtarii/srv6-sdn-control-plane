@@ -1034,6 +1034,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
             # Setup STAMP information
             if ENABLE_STAMP_SUPPORT:
                 logging.info('Configuring STAMP information\n\n')
+
                 for device in request.configuration.devices:
                     # Extract the device ID from the configuration
                     deviceid = device.id
@@ -1468,9 +1469,9 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
 
 
                 # FIXME Remove this just logging -----------------------------------------------------------------------
-                logging.info("\n\n ###################################### INTENT : ")
-                logging.info(intent)
-                ("###################################################################")
+                # logging.info("\n\n ###################################### INTENT : ")
+                # logging.info(intent)
+                # ("###################################################################")
                 # ------------------------------------------------------------------------------------------------------
 
 
@@ -1924,12 +1925,11 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                 for _slice in slices:
 
 
-                    # FIXME Add static hybrid WAN
+                    # FIXME TERMIN* Add static hybrid WAN
                     # Get WAN interface 
-                    wan_interface = storage_helper.get_wan_interfaces(
-                        deviceid=_slice['deviceid'],
-                        tenantid=tenantid
-                    )[0]
+                    # wan_interface = storage_helper.get_wan_interfaces(deviceid=_slice['deviceid'],tenantid=tenantid)[0]
+                    wan_interface = storage_helper.get_wan_interface(deviceid=_slice['deviceid'],tenantid=tenantid,underlay_wan_id=underlay_wan_id)
+
                     
 
                     # Check if WAN interface has IPv6 connectivity
@@ -2996,12 +2996,14 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                 can_use_ipv4_addr_for_wan = True
                 for _slice in slices + incoming_slices:
 
-                    # TODO Add support for multiple WAN interfaces (hybrid WAN)
+                    # TODO TERMIN* Add support for multiple WAN interfaces (hybrid WAN)
                     # Get WAN interface
-                    wan_interface = storage_helper.get_wan_interfaces(
-                        deviceid=_slice['deviceid'],
-                        tenantid=tenantid
-                    )[0]
+                    # wan_interface = storage_helper.get_wan_interfaces(deviceid=_slice['deviceid'],tenantid=tenantid)[0]
+
+                    underlay_wan_id = storage_helper.get_underlay_wan_id(overlayid=overlayid, tenantid=tenantid)
+                    wan_interface = storage_helper.get_wan_interface(deviceid=_slice['deviceid'],tenantid=tenantid,underlay_wan_id=underlay_wan_id)
+
+
 
                     # Check if WAN interface has IPv6 connectivity
                     addrs = storage_helper.get_ext_ipv6_addresses(
@@ -3963,6 +3965,12 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
         # Setup STAMP information
         if ENABLE_STAMP_SUPPORT:
             logging.info('Configuring STAMP information\n\n')
+
+            # FIXME --------------------------------------------------------------
+            200/0
+            # FIXME --------------------------------------------------------------
+
+
             # Lookup the WAN interfaces
             # TODO currently we only support a single WAN interface,
             # so we look for the address of the first WAN interface

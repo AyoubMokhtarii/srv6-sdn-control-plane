@@ -22,6 +22,11 @@ DEFAULT_VERBOSE = False
 logger = logging.getLogger(__name__)
 
 
+# FIXME reomve time import -----------------------------------------
+import time
+# ------------------------------------------------------------------
+
+
 class VXLANTunnel(tunnel_mode.TunnelMode):
     """gRPC request handler"""
 
@@ -113,10 +118,10 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
 
 
         # FIXME remove logging ------------------------------
-        logging.info("RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR")
+        logging.info("\n\n\n\nRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR")
         logging.info(r_slice)
         logging.info(l_slice)
-        logging.info("RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR")
+        logging.info("RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR\n\n\n\n")
         # ------------------------------
 
 
@@ -124,12 +129,8 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
 
 
         # get management IP address for local and remote site
-        mgmt_ip_local_site = storage_helper.get_router_mgmtip(
-            l_slice['deviceid'], tenantid
-        )
-        mgmt_ip_remote_site = storage_helper.get_router_mgmtip(
-            r_slice['deviceid'], tenantid
-        )
+        mgmt_ip_local_site = storage_helper.get_router_mgmtip(l_slice['deviceid'], tenantid)
+        mgmt_ip_remote_site = storage_helper.get_router_mgmtip(r_slice['deviceid'], tenantid)
 
 
         # FIXME remove logging ------------------------------
@@ -145,24 +146,22 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
 
         # get subnet for local and remote site
         lan_sub_remote_sites = storage_helper.get_ip_subnets(
-            id_remote_site, tenantid, r_slice['interface_name']
-        )
+            id_remote_site, tenantid, r_slice['interface_name'])
         lan_sub_local_sites = storage_helper.get_ip_subnets(
-            id_local_site, tenantid, l_slice['interface_name']
-        )
+            id_local_site, tenantid, l_slice['interface_name'])
+       
         # get table ID
-        tableid = storage_helper.get_tableid(
-            overlayid, tenantid
-        )
+        tableid = storage_helper.get_tableid(overlayid, tenantid)
+
         if tableid is None:
             logger.error(
                 'Error while getting table ID assigned to the overlay %s',
                 overlayid
             )
+        
         # transport protocol
-        transport_proto = storage_helper.get_overlay(
-            overlayid=overlayid, tenantid=tenantid
-        )['transport_proto']
+        transport_proto = storage_helper.get_overlay(overlayid=overlayid, tenantid=tenantid)['transport_proto']
+        
         # get VTEP IP remote site and local site
         if transport_proto == 'ipv6':
             vtep_ip_remote_site = storage_helper.get_vtep_ipv6(
@@ -180,43 +179,65 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
             )
         else:
             return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+        
+        
         # get VNI
         vni = storage_helper.get_vni(overlay_name, tenantid)
+        
         # get VTEP name
         vtep_name = 'vxlan-%s' % (vni)
 
-        # TODO Add support for multiple WAN interfaces (hybrid WAN)
+        
+        # Check if the r_slice and l_slice are in the same underaly network 
+        underlay_wan_id = None
+        if r_slice['underlay_wan_id'] == l_slice['underlay_wan_id']:
+            underlay_wan_id = r_slice['underlay_wan_id']
+        else:
+            return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+        
+
+
+        # TODO TERMIN* Add support for multiple WAN interfaces (hybrid WAN)
         # get WAN interface name for local site and remote site
-        wan_intf_local_site = storage_helper.get_wan_interfaces(id_local_site, tenantid)[0]
-        wan_intf_remote_site = storage_helper.get_wan_interfaces(id_remote_site, tenantid)[0]
+        wan_intf_local_site = storage_helper.get_wan_interface(deviceid=id_local_site, tenantid=tenantid, underlay_wan_id=underlay_wan_id)
+        wan_intf_remote_site = storage_helper.get_wan_interface(deviceid=id_remote_site, tenantid=tenantid, underlay_wan_id=underlay_wan_id)  
+
+
+        
+        
         # transport protocol
-        transport_proto = storage_helper.get_overlay(
-            overlayid=overlayid, tenantid=tenantid
-        )['transport_proto']
+        transport_proto = storage_helper.get_overlay(overlayid=overlayid, tenantid=tenantid)['transport_proto']
 
 
 
 
         # FIXME remove logging ------------------------------
-        logging.info("\n\n2222222222222222222222222222")
-        logging.info("lan_sub_remote_sites")
-        logging.info(lan_sub_remote_sites)
-        logging.info("lan_sub_local_sites")
-        logging.info(lan_sub_local_sites)
-        logging.info("tableid")
-        logging.info(tableid)
-        logging.info("transport_proto")
-        logging.info(transport_proto)
-        logging.info("vni")
-        logging.info(vni)
-        logging.info("vtep_name")
-        logging.info(vtep_name)
-        logging.info("wan_intf_local_site")
-        logging.info(wan_intf_local_site)
-        logging.info("wan_intf_remote_site")
-        logging.info(wan_intf_remote_site)
-        logging.info("2222222222222222222222222222\n\n")
+        # logging.info("\n\n2222222222222222222222222222")
+        # logging.info("lan_sub_remote_sites")
+        # logging.info(lan_sub_remote_sites)
+        # logging.info("lan_sub_local_sites")
+        # logging.info(lan_sub_local_sites)
+        # logging.info("tableid")
+        # logging.info(tableid)
+        # logging.info("transport_proto")
+        # logging.info(transport_proto)
+        # logging.info("vni")
+        # logging.info(vni)
+        # logging.info("vtep_name")
+        # logging.info(vtep_name)
+        # logging.info("wan_intf_local_site")
+        # logging.info(wan_intf_local_site)
+        # logging.info("wan_intf_remote_site")
+        # logging.info(wan_intf_remote_site)
+        # logging.info("underlay_wan_id")
+        # logging.info(underlay_wan_id)
+        # logging.info("2222222222222222222222222222\n\n")
         # ---------------------------------------------------
+
+
+
+
+
 
 
         # get external IP address for loal site and remote site
@@ -228,19 +249,20 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
             wan_ip_remote_site = storage_helper.get_ext_ipv4_addresses(id_remote_site, tenantid, wan_intf_remote_site)[0].split("/")[0]
         else:
             return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+        
         # DB key creation, one per tunnel direction
         key_local_to_remote = '%s-%s' % (id_local_site, id_remote_site)
         key_remote_to_local = '%s-%s' % (id_remote_site, id_local_site)
 
 
-        # FIXME remove logging ------------------------------------------
-        logging.info("\n\n3333333333333333333333333333333")
-        logging.info("key_local_to_remote")
-        logging.info(key_local_to_remote)
-        logging.info("key_remote_to_local")
-        logging.info(key_remote_to_local)
-        logging.info("\n\n3333333333333333333333333333333")
-        # -------------------------------------------------------------
+        # # FIXME remove logging ------------------------------------------
+        # logging.info("\n\n3333333333333333333333333333333")
+        # logging.info("key_local_to_remote")
+        # logging.info(key_local_to_remote)
+        # logging.info("key_remote_to_local")
+        # logging.info(key_remote_to_local)
+        # logging.info("\n\n3333333333333333333333333333333")
+        # # -------------------------------------------------------------
 
 
 
@@ -253,8 +275,9 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
             },
             {
                 'created_tunnel.$.tunnel_key': 1
-            }
-        )
+            })
+        
+
         dictionary_remote = self.overlays.find_one(
             {
                 '_id': ObjectId(overlayid),
@@ -263,8 +286,7 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
             },
             {
                 'created_tunnel.$.tunnel_key': 1
-            }
-        )
+            })
 
 
         # FIXME remove logging ------------------------------
@@ -350,6 +372,7 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
                 return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
             # update local dictionary
             tunnel_remote['fdb_entry_config'] = True
+        
         # set route in local site for the remote subnet, if not present
         for lan_sub_remote_site in lan_sub_remote_sites:
             lan_sub_remote_site = lan_sub_remote_site['subnet']
@@ -366,11 +389,12 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
                     logger.warning(
                         'Cannot set route for %s in %s ',
                         lan_sub_remote_site,
-                        mgmt_ip_local_site
-                    )
+                        mgmt_ip_local_site)
+                    
                     return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
                 # update local dictionary with the new subnet in overlay
                 tunnel_local.get('reach_subnets').append(lan_sub_remote_site)
+        
         # set route in remote site for the local subnet, if not present
         for lan_sub_local_site in lan_sub_local_sites:
             lan_sub_local_site = lan_sub_local_site['subnet']
@@ -392,6 +416,8 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
                     return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
                 # update local dictionary with the new subnet in overlay
                 tunnel_remote.get('reach_subnets').append(lan_sub_local_site)
+        
+        
         # Insert the device overlay state in DB,
         # if there is already a state update it
         #
@@ -416,6 +442,7 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
                 }
             }
         ).matched_count == 1
+        
         if new_doc_created is False:
             self.overlays.update_one(
                 {
@@ -481,6 +508,7 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
         # Success
         return NbStatusCode.STATUS_OK
 
+
     def init_overlay(self, overlayid, overlay_name,
                      overlay_type, tenantid, deviceid, overlay_info):
         # get device management IP address
@@ -503,9 +531,16 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
         # get VRF name
         vrf_name = 'vrf-%s' % (tableid)
         
+
+        
         # get WAN interface
-        # TODO Add support for multiple WAN interfaces (hybrid WAN)
-        wan_intf_site = storage_helper.get_wan_interfaces(deviceid, tenantid)[0]
+        # TODO TERMIN* Add support for multiple WAN interfaces (hybrid WAN)
+        # wan_intf_site = storage_helper.get_wan_interfaces(deviceid, tenantid)[0]
+        underlay_wan_id = storage_helper.get_underlay_wan_id(overlayid=overlayid, tenantid=tenantid)
+        wan_intf_site = storage_helper.get_wan_interface(deviceid=deviceid, tenantid=tenantid, underlay_wan_id=underlay_wan_id)
+
+
+         
         
         # get VNI for the overlay
         vni = storage_helper.get_vni(overlay_name, tenantid)
@@ -580,20 +615,25 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
         # Success
         return NbStatusCode.STATUS_OK
 
+
     def init_overlay_data(self, overlayid,
                           overlay_name, tenantid, overlay_info):
         # get VNI
         vni = storage_helper.get_vni(
             overlay_name, tenantid
         )
+        
         if vni == -1:
             vni = storage_helper.get_new_vni(
                 overlay_name, tenantid
             )
+
         # get table ID
         tableid = storage_helper.get_new_tableid(
             overlayid, tenantid
         )
+
+
         if tableid is None:
             logger.error(
                 'Cannot get a new table ID for the overlay %s',
@@ -726,9 +766,12 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
         )
 
         # get WAN interface name for local site and remote site
-        # TODO Add support for multiple WAN interfaces (hybrid WAN)
-        wan_intf_local_site = storage_helper.get_wan_interfaces(id_local_site, tenantid)[0]
-        wan_intf_remote_site = storage_helper.get_wan_interfaces(id_remote_site, tenantid)[0]
+        # TODO TERMIN* Add support for multiple WAN interfaces (hybrid WAN)
+        # wan_intf_local_site = storage_helper.get_wan_interfaces(id_local_site, tenantid)[0]
+        # wan_intf_remote_site = storage_helper.get_wan_interfaces(id_remote_site, tenantid)[0]
+        underlay_wan_id = storage_helper.get_underlay_wan_id(overlayid, tenantid)
+        wan_intf_local_site = storage_helper.get_wan_interface(deviceid=id_local_site, tenantid=tenantid, underlay_wan_id=underlay_wan_id)
+        wan_intf_remote_site = storage_helper.get_wan_interface(deviceid=id_remote_site, tenantid=tenantid, underlay_wan_id=underlay_wan_id)
 
 
         # transport protocol
@@ -1267,8 +1310,12 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
         vtep_name = 'vxlan-%s' % (vni)
 
         # get WAN interface name for local site and remote site
-        # TODO Add support for multiple WAN interfaces (hybrid WAN)
-        wan_intf_remote_site = storage_helper.get_wan_interfaces(id_remote_site, tenantid)[0]
+        # TODO TERMIN* Add support for multiple WAN interfaces (hybrid WAN)
+        # wan_intf_remote_site = storage_helper.get_wan_interfaces(id_remote_site, tenantid)[0]
+        underlay_wan_id = storage_helper.get_underlay_wan_id(overlayid, tenantid)
+        wan_intf_remote_site = storage_helper.get_wan_interface(deviceid=id_remote_site, tenantid=tenantid, underlay_wan_id=underlay_wan_id)
+
+        
 
         # transport protocol
         transport_proto = storage_helper.get_overlay(
@@ -1434,8 +1481,10 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
         vrf_name = 'vrf-%s' % (tableid)
         
         # get WAN interface
-        # TODO Add support for multiple WAN interfaces (hybrid WAN)
-        wan_intf_site = storage_helper.get_wan_interfaces(deviceid, tenantid)[0]
+        # TODO TERMIN* Add support for multiple WAN interfaces (hybrid WAN)
+        # wan_intf_site = storage_helper.get_wan_interfaces(deviceid, tenantid)[0]
+        underlay_wan_id = storage_helper.get_underlay_wan_id(overlayid, tenantid)
+        wan_intf_site = storage_helper.get_wan_interface(deviceid=deviceid, tenantid=tenantid, underlay_wan_id=underlay_wan_id)
 
         # get VNI for the overlay
         vni = storage_helper.get_vni(overlay_name, tenantid)
