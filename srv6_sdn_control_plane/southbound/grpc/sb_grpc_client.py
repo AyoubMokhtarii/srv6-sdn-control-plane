@@ -1110,6 +1110,8 @@ class SRv6Manager:
         # Return the response
         return response
 
+    # CRUD VXLAN
+
     def createVxLAN(self, server_ip, server_port, ifname, vxlan_link, vxlan_id,
                     vxlan_port, vxlan_group=None):
         # Create message request

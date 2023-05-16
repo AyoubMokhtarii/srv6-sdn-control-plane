@@ -2124,7 +2124,23 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                     counter = storage_helper.get_and_inc_tunnel_mode_counter(
                         tunnel_name, deviceid, tenantid
                     )
-                    if counter == 0:
+
+
+                    if counter is None:
+                        err = 'Cannot increase tunnel mode counter'
+                        logging.error(err)
+                        # # Remove overlay DB status
+                        # if storage_helper.remove_overlay(
+                        #         overlayid, tenantid) is not True:
+                        #     logging.error(
+                        #         'Cannot remove overlay. Inconsistent data')
+                        return OverlayServiceReply(
+                            status=Status(
+                                code=STATUS_INTERNAL_SERVER_ERROR,
+                                reason=err
+                            )
+                        )
+                    else:
                         # Add reverse action to the rollback stack
                         rollback.push(
                             func=(
@@ -2134,7 +2150,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                             deviceid=deviceid,
                             tenantid=tenantid
                         )
-                        status_code = tunnel_mode.init_tunnel_mode(
+                        status_code = tunnel_mode.init_tunnel_mode_2_0(
                             deviceid, tenantid, tunnel_info
                         )
                         if status_code != STATUS_OK:
@@ -2159,36 +2175,13 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                             tenantid=tenantid,
                             overlay_info=tunnel_info
                         )
-                    elif counter is None:
-                        err = 'Cannot increase tunnel mode counter'
-                        logging.error(err)
-                        # # Remove overlay DB status
-                        # if storage_helper.remove_overlay(
-                        #         overlayid, tenantid) is not True:
-                        #     logging.error(
-                        #         'Cannot remove overlay. Inconsistent data')
-                        return OverlayServiceReply(
-                            status=Status(
-                                code=STATUS_INTERNAL_SERVER_ERROR,
-                                reason=err
-                            )
-                        )
-                    else:
-                        # Success
-                        # Add reverse action to the rollback stack
-                        rollback.push(
-                            func=(
-                                storage_helper.dec_and_get_tunnel_mode_counter
-                            ),
-                            tunnel_name=tunnel_name,
-                            deviceid=deviceid,
-                            tenantid=tenantid
-                        )
+                    
+                    
                     # Check if we have already configured the overlay on the
                     # device
                     if deviceid in _devices:
                         # Init overlay on the devices
-                        status_code = tunnel_mode.init_overlay(
+                        status_code = tunnel_mode.init_overlay_2_0(
                             overlayid,
                             overlay_name,
                             overlay_type,
@@ -2213,7 +2206,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                             )
                         # Add reverse action to the rollback stack
                         rollback.push(
-                            func=tunnel_mode.destroy_overlay,
+                            func=tunnel_mode.destroy_overlay_2_0,
                             overlayid=overlayid,
                             overlay_name=overlay_name,
                             overlay_type=overlay_type,
@@ -2224,7 +2217,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                         # Remove device from the to-be-configured devices set
                         _devices.remove(deviceid)
                     # Add the interface to the overlay
-                    status_code = tunnel_mode.add_slice_to_overlay(
+                    status_code = tunnel_mode.add_slice_to_overlay_2_0(
                         overlayid,
                         overlay_name,
                         deviceid,
@@ -2234,7 +2227,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                     )
                     if status_code != STATUS_OK:
                         err = (
-                            'Cannot add slice to overlay (overlay %s, '
+                            '1 Cannot add slice to overlay (overlay %s, '
                             'device %s, slice %s, tenant %s)' %
                             (overlay_name, deviceid, lan_interface_name, tenantid)
                         )
@@ -2249,7 +2242,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                         )
                     # Add reverse action to the rollback stack
                     rollback.push(
-                        func=tunnel_mode.remove_slice_from_overlay,
+                        func=tunnel_mode.remove_slice_from_overlay_2_0,
                         overlayid=overlayid,
                         overlay_name=overlay_name,
                         deviceid=deviceid,
@@ -2299,6 +2292,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                             )
                     # Add the slice to the configured set
                     configured_slices.append(site1)
+
             # Success, commit all performed operations
             rollback.commitAll()
         logging.info('All the intents have been processed successfully\n\n')
@@ -3214,7 +3208,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                     )
                     if status_code != STATUS_OK:
                         err = (
-                            'Cannot add slice to overlay (overlay %s, '
+                            '2 Cannot add slice to overlay (overlay %s, '
                             'device %s, slice %s, tenant %s)' %
                             (overlay_name, deviceid, interface_name, tenantid)
                         )
@@ -4138,7 +4132,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                     )
                     if status_code != STATUS_OK:
                         err = (
-                            'Cannot add slice to overlay (overlay %s, '
+                            '3 Cannot add slice to overlay (overlay %s, '
                             'device %s, slice %s, tenant %s)' %
                             (overlay_name, deviceid, interface_name, tenantid)
                         )

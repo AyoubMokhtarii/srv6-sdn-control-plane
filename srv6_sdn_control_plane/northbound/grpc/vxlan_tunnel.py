@@ -8,6 +8,7 @@ from bson.objectid import ObjectId
 from srv6_sdn_control_plane.northbound.grpc import tunnel_mode
 from srv6_sdn_control_plane.southbound.grpc import sb_grpc_client
 from srv6_sdn_control_plane.srv6_controller_utils import OverlayType
+from srv6_sdn_control_plane.srv6_controller_utils import MAIN_ROUTING_TABLE
 from srv6_sdn_controller_state import (
     srv6_sdn_controller_state as storage_helper
 )
@@ -180,6 +181,17 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
         else:
             return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
         
+
+        # FIXME remove logging ------------------------------
+        logging.info("\n\n$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
+        logging.info("vtep_ip_remote_site")
+        logging.info(vtep_ip_remote_site)
+        logging.info("vtep_ip_local_site")
+        logging.info(vtep_ip_local_site)
+        logging.info("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n\n")
+        # ---------------------------------------------------
+
+
         
         # get VNI
         vni = storage_helper.get_vni(overlay_name, tenantid)
@@ -203,42 +215,8 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
         wan_intf_remote_site = storage_helper.get_wan_interface(deviceid=id_remote_site, tenantid=tenantid, underlay_wan_id=underlay_wan_id)  
 
 
-        
-        
         # transport protocol
         transport_proto = storage_helper.get_overlay(overlayid=overlayid, tenantid=tenantid)['transport_proto']
-
-
-
-
-        # FIXME remove logging ------------------------------
-        # logging.info("\n\n2222222222222222222222222222")
-        # logging.info("lan_sub_remote_sites")
-        # logging.info(lan_sub_remote_sites)
-        # logging.info("lan_sub_local_sites")
-        # logging.info(lan_sub_local_sites)
-        # logging.info("tableid")
-        # logging.info(tableid)
-        # logging.info("transport_proto")
-        # logging.info(transport_proto)
-        # logging.info("vni")
-        # logging.info(vni)
-        # logging.info("vtep_name")
-        # logging.info(vtep_name)
-        # logging.info("wan_intf_local_site")
-        # logging.info(wan_intf_local_site)
-        # logging.info("wan_intf_remote_site")
-        # logging.info(wan_intf_remote_site)
-        # logging.info("underlay_wan_id")
-        # logging.info(underlay_wan_id)
-        # logging.info("2222222222222222222222222222\n\n")
-        # ---------------------------------------------------
-
-
-
-
-
-
 
         # get external IP address for loal site and remote site
         if transport_proto == 'ipv6':
@@ -253,17 +231,6 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
         # DB key creation, one per tunnel direction
         key_local_to_remote = '%s-%s' % (id_local_site, id_remote_site)
         key_remote_to_local = '%s-%s' % (id_remote_site, id_local_site)
-
-
-        # # FIXME remove logging ------------------------------------------
-        # logging.info("\n\n3333333333333333333333333333333")
-        # logging.info("key_local_to_remote")
-        # logging.info(key_local_to_remote)
-        # logging.info("key_remote_to_local")
-        # logging.info(key_remote_to_local)
-        # logging.info("\n\n3333333333333333333333333333333")
-        # # -------------------------------------------------------------
-
 
 
         # get tunnel dictionaries from DB
@@ -287,17 +254,6 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
             {
                 'created_tunnel.$.tunnel_key': 1
             })
-
-
-        # FIXME remove logging ------------------------------
-        logging.info("\n\n444444444444444444444444444444444444444444")
-        logging.info("dictionary_local")
-        logging.info(dictionary_local)
-        logging.info("dictionary_remote")
-        logging.info(dictionary_remote)
-        logging.info("\n\n444444444444444444444444444444444444444444")
-        # ---------------------------------------------------
-
 
 
 
@@ -372,6 +328,10 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
                 return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
             # update local dictionary
             tunnel_remote['fdb_entry_config'] = True
+
+
+   
+        
         
         # set route in local site for the remote subnet, if not present
         for lan_sub_remote_site in lan_sub_remote_sites:
@@ -395,6 +355,9 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
                 # update local dictionary with the new subnet in overlay
                 tunnel_local.get('reach_subnets').append(lan_sub_remote_site)
         
+    
+
+
         # set route in remote site for the local subnet, if not present
         for lan_sub_local_site in lan_sub_local_sites:
             lan_sub_local_site = lan_sub_local_site['subnet']
@@ -416,8 +379,43 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
                     return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
                 # update local dictionary with the new subnet in overlay
                 tunnel_remote.get('reach_subnets').append(lan_sub_local_site)
+
+
+
+        # Add the default ip rule to lookup for the tunnel table -  remote site 
+        response = self.srv6_manager.create_iprule(
+            mgmt_ip_remote_site,
+            self.grpc_client_port,
+            table=tableid,
+            family=AF_INET)
+        if response != SbStatusCode.STATUS_SUCCESS:
+            # If the operation has failed, report an error message
+            logger.warning(
+                '[remote site] Cannot Add the default ip rule to lookup for the tunnel table %s in %s',
+                tableid,
+                mgmt_ip_remote_site
+            )
+            return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
         
+
+        # Add the default ip rule to lookup for the tunnel table -  local site 
+        response = self.srv6_manager.create_iprule(
+            mgmt_ip_local_site,
+            self.grpc_client_port,
+            table=tableid,
+            family=AF_INET)
+        if response != SbStatusCode.STATUS_SUCCESS:
+            # If the operation has failed, report an error message
+            logger.warning(
+                '[local site] Cannot Add the default ip rule to lookup for the tunnel table %s in %s',
+                tableid,
+                mgmt_ip_local_site)
+            
+            return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
         
+
+
+
         # Insert the device overlay state in DB,
         # if there is already a state update it
         #
@@ -508,26 +506,202 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
         # Success
         return NbStatusCode.STATUS_OK
 
+    def add_slice_to_overlay_2_0(self, overlayid, overlay_name,
+                             deviceid, interface_name, tenantid, overlay_info):
+        
+        # Check if we already added the slices to the device 
+        # i.e if we created routes from device to sub-local networks 
+        # if device is paricipating in at least one overlay ==> we already added the routes to the sub-local networks
+        # FIXME : change the get_overlays_containing_device to get_VXLAN_tunnel_counters
+        overlays = storage_helper.get_overlays_containing_device(deviceid=deviceid, tenantid=tenantid)
+
+        #FIXME remove this just logging --------------------------------------------------------
+        logging.info('\n\n\nJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJ overlays : %s', overlays)
+        logging.info('\n\n\n')
+        #FIXME remove this just logging --------------------------------------------------------
+
+
+
+        # if overlays is not None :
+        #     return NbStatusCode.STATUS_OK
+        
+
+
+
+        # Get device management IP address
+        mgmt_ip_site = storage_helper.get_router_mgmtip(
+            deviceid, tenantid
+        )
+        main_tableid = MAIN_ROUTING_TABLE
+
+
+        # # get table ID
+        # tableid = storage_helper.get_tableid(
+        #     overlayid, tenantid
+        # )
+        
+        # if tableid is None:
+        #     logger.error(
+        #         'Error while getting table ID assigned to the overlay %s',
+        #         overlayid
+        #     )
+
+        
+        
+        # # add slice to the VRF
+        # response = self.srv6_manager.update_vrf_device(
+        #     mgmt_ip_site,
+        #     self.grpc_client_port,
+        #     name=vrf_name,
+        #     interfaces=[interface_name],
+        #     op='add_interfaces'
+        # )
+        # if response != SbStatusCode.STATUS_SUCCESS:
+        #     # If the operation has failed, report an error message
+        #     logger.warning(
+        #         'Cannot add interface %s to the VRF %s in %s',
+        #         interface_name,
+        #         vrf_name,
+        #         mgmt_ip_site
+        #     )
+        #     return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+        
+
+
+        # Create routes for subnets
+        # get subnet for local and remote site
+        subnets = storage_helper.get_ip_subnets(
+            deviceid, tenantid, interface_name
+        )
+        for subnet in subnets:
+            gateway = subnet['gateway']
+            subnet = subnet['subnet']
+            if gateway is not None and gateway != '':
+                response = self.srv6_manager.create_iproute(
+                    mgmt_ip_site,
+                    self.grpc_client_port,
+                    destination=subnet,
+                    gateway=gateway,
+                    out_interface=interface_name,
+                    table=main_tableid
+                )
+                if response != SbStatusCode.STATUS_SUCCESS:
+                    # If the operation has failed, report an error message
+                    logger.warning(
+                        'Cannot set route for %s (gateway %s) in %s ',
+                        subnet,
+                        gateway,
+                        mgmt_ip_site
+                    )
+                    return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+        # Success
+        return NbStatusCode.STATUS_OK
+
+    def init_overlay_2_0(self, overlayid, overlay_name,
+                     overlay_type, tenantid, deviceid, overlay_info):
+        # get device management IP address
+        mgmt_ip_site = storage_helper.get_router_mgmtip(deviceid, tenantid)
+
+        # Get vxlan port set by user
+        vxlan_port_site = storage_helper.get_tenant_vxlan_port(tenantid)
+
+        # get table ID
+        tableid = storage_helper.get_tableid(overlayid, tenantid)
+
+        if tableid is None:
+            logger.error(
+                'Error while getting table ID assigned to the overlay %s',overlayid)
+        
+        
+        
+        # get WAN interface
+        # TODO TERMIN* Add support for multiple WAN interfaces (hybrid WAN)
+        # wan_intf_site = storage_helper.get_wan_interfaces(deviceid, tenantid)[0]
+        underlay_wan_id = storage_helper.get_underlay_wan_id(overlayid=overlayid, tenantid=tenantid)
+        wan_intf_site = storage_helper.get_wan_interface(deviceid=deviceid, tenantid=tenantid, underlay_wan_id=underlay_wan_id)
+
+
+         
+        
+        # get VNI for the overlay
+        vni = storage_helper.get_vni(overlay_name, tenantid)
+        
+        # get VTEP name
+        vtep_name = 'vxlan-%s' % (vni)
+        
+        # get VTEP IP address
+        if overlay_type == OverlayType.IPv6Overlay:
+            vtep_ip_site = storage_helper.get_vtep_ipv6(
+                deviceid, tenantid
+            )
+            vtep_ip_family = AF_INET6
+        else:
+            vtep_ip_site = storage_helper.get_vtep_ip(
+                deviceid, tenantid
+            )
+            vtep_ip_family = AF_INET
+        
+        
+        # transport protocol
+        transport_proto = storage_helper.get_overlay(
+            overlayid=overlayid, tenantid=tenantid)['transport_proto']
+        
+        # crete VTEP interface
+        response = self.srv6_manager.createVxLAN(
+            mgmt_ip_site,
+            self.grpc_client_port,
+            ifname=vtep_name,
+            vxlan_link=wan_intf_site,
+            vxlan_id=vni,
+            vxlan_port=vxlan_port_site,
+            vxlan_group='::' if transport_proto == 'ipv6' else '0.0.0.0'
+        )
+        if response != SbStatusCode.STATUS_SUCCESS:
+            # If the operation has failed, report an error message
+            logger.warning(
+                'Cannot create VTEP %s in %s',
+                vtep_name,
+                mgmt_ip_site
+            )
+            return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+        # set VTEP IP address
+        response = self.srv6_manager.create_ipaddr(
+            mgmt_ip_site,
+            self.grpc_client_port,
+            ip_addr=vtep_ip_site,
+            device=vtep_name, net='',
+            family=vtep_ip_family
+        )
+        if response != SbStatusCode.STATUS_SUCCESS:
+            # If the operation has failed, report an error message
+            logger.warning(
+                'Cannot set IP %s for VTEP %s in %s',
+                vtep_ip_site,
+                vtep_name,
+                mgmt_ip_site
+            )
+            return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+
+        # Success
+        return NbStatusCode.STATUS_OK
 
     def init_overlay(self, overlayid, overlay_name,
                      overlay_type, tenantid, deviceid, overlay_info):
         # get device management IP address
-        mgmt_ip_site = storage_helper.get_router_mgmtip(
-            deviceid, tenantid
-        )
+        mgmt_ip_site = storage_helper.get_router_mgmtip(deviceid, tenantid)
+
         # Get vxlan port set by user
-        vxlan_port_site = storage_helper.get_tenant_vxlan_port(
-            tenantid
-        )
+        vxlan_port_site = storage_helper.get_tenant_vxlan_port(tenantid)
+
         # get table ID
-        tableid = storage_helper.get_tableid(
-            overlayid, tenantid
-        )
+        tableid = storage_helper.get_tableid(overlayid, tenantid)
+
         if tableid is None:
             logger.error(
                 'Error while getting table ID assigned to the overlay %s',
                 overlayid
             )
+        
         # get VRF name
         vrf_name = 'vrf-%s' % (tableid)
         
@@ -615,7 +789,6 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
         # Success
         return NbStatusCode.STATUS_OK
 
-
     def init_overlay_data(self, overlayid,
                           overlay_name, tenantid, overlay_info):
         # get VNI
@@ -649,9 +822,12 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
             deviceid, tenantid
         )
         if vtep_ip_site == -1:
+
             vtep_ip_site = storage_helper.get_new_vtep_ip(
                 deviceid, tenantid
             )
+           
+
         vtep_ipv6_site = storage_helper.get_vtep_ipv6(
             deviceid, tenantid
         )
@@ -661,6 +837,29 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
             )
         # Success
         return NbStatusCode.STATUS_OK
+
+
+
+    def init_tunnel_mode_2_0(self, deviceid, tenantid, overlay_info):
+        # get VTEP IP address for site1
+        vtep_ip_site = storage_helper.get_new_vtep_ip_unique(
+            deviceid, tenantid
+        )
+
+        # FIXME remove this just logging -----------------------------------
+        logging.info("\n\n_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*get_new_vtep_ip_unique*_*_*_*_*_*_*_*_*_*_*_*__*_*_*_*_*_")
+        logging.info(vtep_ip_site)
+        logging.info("_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*__*_*_*_*_*_\n\n")
+        # FIXME remove this just logging -----------------------------------
+
+        vtep_ipv6_site = storage_helper.get_new_vtep_ipv6_unique(
+                deviceid, tenantid
+            )
+        # Success
+        return NbStatusCode.STATUS_OK
+
+ 
+
 
     def remove_slice_from_overlay(self, overlayid, overlay_name, deviceid,
                                   interface_name, tenantid, overlay_info,
@@ -744,6 +943,76 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
                 mgmt_ip_site
             )
             return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+        # Success
+        return NbStatusCode.STATUS_OK
+
+    def remove_slice_from_overlay_2_0(self, overlayid, overlay_name, deviceid,
+                                  interface_name, tenantid, overlay_info,
+                                  ignore_errors=False):
+        if not storage_helper.is_device_connected(
+            deviceid=deviceid, tenantid=tenantid
+        ):
+            # The device is not connected, we skip it and we schedule a reboot
+            #
+            # Change device state to reboot required
+            success = storage_helper.change_device_state(
+                deviceid=deviceid,
+                tenantid=tenantid,
+                new_state=(
+                    storage_helper.DeviceState.REBOOT_REQUIRED
+                )
+            )
+            if success is False or success is None:
+                logging.error('Error changing the device state')
+                return NbStatusCode.STATUS_INTERNAL_ERROR
+            return NbStatusCode.STATUS_OK
+        
+        # get device management IP address
+        mgmt_ip_site = storage_helper.get_router_mgmtip(
+            deviceid, tenantid
+        )
+
+        main_tableid = MAIN_ROUTING_TABLE
+
+
+        # # retrive table ID
+        # tableid = storage_helper.get_tableid(
+        #     overlayid, tenantid
+        # )
+        # if tableid is None:
+        #     logger.error(
+        #         'Error while getting table ID assigned to the overlay %s',
+        #         overlayid
+        #     )
+
+
+
+
+        # Remove IP routes from the main table
+        # get subnet for local and remote site
+        subnets = storage_helper.get_ip_subnets(deviceid, tenantid, interface_name)
+        
+        for subnet in subnets:
+            gateway = subnet['gateway']
+            subnet = subnet['subnet']
+            if gateway is not None and gateway != '':
+                response = self.srv6_manager.remove_iproute(
+                    mgmt_ip_site,
+                    self.grpc_client_port,
+                    destination=subnet,
+                    gateway=gateway,
+                    table=main_tableid
+                )
+                if response != SbStatusCode.STATUS_SUCCESS:
+                    # If the operation has failed, report an error message
+                    logger.warning(
+                        'Cannot remove route for %s (gateway %s) in %s ',
+                        subnet,
+                        gateway,
+                        mgmt_ip_site
+                    )
+                    return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+    
         # Success
         return NbStatusCode.STATUS_OK
 
@@ -1169,6 +1438,90 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
             logger.warning(
                 'Cannot remove VRF %s in %s',
                 vrf_name,
+                mgmt_ip_site
+            )
+            return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+        # Success
+        return NbStatusCode.STATUS_OK
+
+    def destroy_overlay_2_0(self, overlayid, overlay_name,
+                        overlay_type, tenantid, deviceid, overlay_info,
+                        ignore_errors=False):
+        if not storage_helper.is_device_connected(
+            deviceid=deviceid, tenantid=tenantid
+        ):
+            # The device is not connected, we skip it and we schedule a reboot
+            #
+            # Change device state to reboot required
+            success = storage_helper.change_device_state(
+                deviceid=deviceid,
+                tenantid=tenantid,
+                new_state=(
+                    storage_helper.DeviceState.REBOOT_REQUIRED
+                )
+            )
+            if success is False or success is None:
+                logging.error('Error changing the device state')
+                return NbStatusCode.STATUS_INTERNAL_ERROR
+            return NbStatusCode.STATUS_OK
+        # get device management IP address
+        mgmt_ip_site = storage_helper.get_router_mgmtip(
+            deviceid, tenantid
+        )
+        # get VNI
+        vni = storage_helper.get_vni(overlay_name, tenantid)
+        # get table ID
+        tableid = storage_helper.get_tableid(
+            overlayid, tenantid
+        )
+        if tableid is None:
+            logger.error(
+                'Error while getting table ID assigned to the overlay %s',
+                overlayid
+            )
+        
+        # get VTEP name
+        vtep_name = 'vxlan-%s' % (vni)
+        
+        # get VTEP IP address
+        if overlay_type == OverlayType.IPv6Overlay:
+            vtep_ip_site = storage_helper.get_vtep_ipv6(
+                deviceid, tenantid
+            )
+            vtep_ip_family = AF_INET6
+        else:
+            vtep_ip_site = storage_helper.get_vtep_ip(
+                deviceid, tenantid
+            )
+            vtep_ip_family = AF_INET
+        # get VTEP IP address
+        response = self.srv6_manager.remove_ipaddr(
+            mgmt_ip_site,
+            self.grpc_client_port,
+            ip_addr=vtep_ip_site,
+            device=vtep_name,
+            family=vtep_ip_family
+        )
+        if response != SbStatusCode.STATUS_SUCCESS:
+            # If the operation has failed, report an error message
+            logger.warning(
+                'Cannot remove the address %s of VTEP %s in %s',
+                vtep_ip_site,
+                vtep_name,
+                mgmt_ip_site
+            )
+            return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+        # remove VTEP
+        response = self.srv6_manager.delVxLAN(
+            mgmt_ip_site,
+            self.grpc_client_port,
+            ifname=vtep_name
+        )
+        if response != SbStatusCode.STATUS_SUCCESS:
+            # If the operation has failed, report an error message
+            logger.warning(
+                'Cannot remove VTEP %s in %s',
+                vtep_name,
                 mgmt_ip_site
             )
             return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
