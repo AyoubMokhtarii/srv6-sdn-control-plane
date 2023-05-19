@@ -117,12 +117,11 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
         id_remote_site = r_slice['deviceid']
         id_local_site = l_slice['deviceid']
 
-
-        # FIXME remove logging ------------------------------
-        logging.info("\n\n\n\nRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR")
-        logging.info(r_slice)
-        logging.info(l_slice)
-        logging.info("RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR\n\n\n\n")
+        # # FIXME remove logging ------------------------------
+        # logging.info("\n\n\n\nRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR")
+        # logging.info(r_slice)
+        # logging.info(l_slice)
+        # logging.info("RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR\n\n\n\n")
         # ------------------------------
 
 
@@ -134,14 +133,14 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
         mgmt_ip_remote_site = storage_helper.get_router_mgmtip(r_slice['deviceid'], tenantid)
 
 
-        # FIXME remove logging ------------------------------
-        logging.info("\n\n11111111111111111111111111111111")
-        logging.info("mgmt_ip_local_site")
-        logging.info(mgmt_ip_local_site)
-        logging.info("mgmt_ip_remote_site")
-        logging.info(mgmt_ip_remote_site)
-        logging.info("11111111111111111111111111111111\n\n")
-        # ---------------------------------------------------
+        # # FIXME remove logging ------------------------------
+        # logging.info("\n\n11111111111111111111111111111111")
+        # logging.info("mgmt_ip_local_site")
+        # logging.info(mgmt_ip_local_site)
+        # logging.info("mgmt_ip_remote_site")
+        # logging.info(mgmt_ip_remote_site)
+        # logging.info("11111111111111111111111111111111\n\n")
+        # # ---------------------------------------------------
 
 
 
@@ -182,14 +181,14 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
             return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
         
 
-        # FIXME remove logging ------------------------------
-        logging.info("\n\n$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
-        logging.info("vtep_ip_remote_site")
-        logging.info(vtep_ip_remote_site)
-        logging.info("vtep_ip_local_site")
-        logging.info(vtep_ip_local_site)
-        logging.info("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n\n")
-        # ---------------------------------------------------
+        # # FIXME remove logging ------------------------------
+        # logging.info("\n\n$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
+        # logging.info("vtep_ip_remote_site")
+        # logging.info(vtep_ip_remote_site)
+        # logging.info("vtep_ip_local_site")
+        # logging.info(vtep_ip_local_site)
+        # logging.info("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n\n")
+        # # ---------------------------------------------------
 
 
         
@@ -330,7 +329,12 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
             tunnel_remote['fdb_entry_config'] = True
 
 
-   
+        # FIXME remove this just for logging --------------------------------------------------
+        logging.info("\n\n\nwan_intf_local_site: %s", wan_intf_local_site)
+        logging.info("wan_intf_remote_site: %s \n\n\n", wan_intf_remote_site)
+        # time.sleep(100)
+        # FIXME remove this just for logging --------------------------------------------------
+
         
         
         # set route in local site for the remote subnet, if not present
@@ -342,7 +346,8 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
                     self.grpc_client_port,
                     destination=lan_sub_remote_site,
                     gateway=vtep_ip_remote_site.split("/")[0],
-                    table=tableid
+                    table=tableid,
+                    out_interface=vtep_name
                 )
                 if response != SbStatusCode.STATUS_SUCCESS:
                     # If the operation has failed, report an error message
@@ -358,6 +363,7 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
     
 
 
+
         # set route in remote site for the local subnet, if not present
         for lan_sub_local_site in lan_sub_local_sites:
             lan_sub_local_site = lan_sub_local_site['subnet']
@@ -367,7 +373,8 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
                     self.grpc_client_port,
                     destination=lan_sub_local_site,
                     gateway=vtep_ip_local_site.split("/")[0],
-                    table=tableid
+                    table=tableid,
+                    out_interface=vtep_name
                 )
                 if response != SbStatusCode.STATUS_SUCCESS:
                     # If the operation has failed, report an error message
@@ -509,25 +516,6 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
     def add_slice_to_overlay_2_0(self, overlayid, overlay_name,
                              deviceid, interface_name, tenantid, overlay_info):
         
-        # Check if we already added the slices to the device 
-        # i.e if we created routes from device to sub-local networks 
-        # if device is paricipating in at least one overlay ==> we already added the routes to the sub-local networks
-        # FIXME : change the get_overlays_containing_device to get_VXLAN_tunnel_counters
-        overlays = storage_helper.get_overlays_containing_device(deviceid=deviceid, tenantid=tenantid)
-
-        #FIXME remove this just logging --------------------------------------------------------
-        logging.info('\n\n\nJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJ overlays : %s', overlays)
-        logging.info('\n\n\n')
-        #FIXME remove this just logging --------------------------------------------------------
-
-
-
-        # if overlays is not None :
-        #     return NbStatusCode.STATUS_OK
-        
-
-
-
         # Get device management IP address
         mgmt_ip_site = storage_helper.get_router_mgmtip(
             deviceid, tenantid

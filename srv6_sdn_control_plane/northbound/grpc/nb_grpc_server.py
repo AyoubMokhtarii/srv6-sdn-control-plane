@@ -2216,40 +2216,68 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                         )
                         # Remove device from the to-be-configured devices set
                         _devices.remove(deviceid)
-                    # Add the interface to the overlay
-                    status_code = tunnel_mode.add_slice_to_overlay_2_0(
-                        overlayid,
-                        overlay_name,
-                        deviceid,
-                        lan_interface_name,
-                        tenantid,
-                        tunnel_info
-                    )
-                    if status_code != STATUS_OK:
-                        err = (
-                            '1 Cannot add slice to overlay (overlay %s, '
-                            'device %s, slice %s, tenant %s)' %
-                            (overlay_name, deviceid, lan_interface_name, tenantid)
-                        )
-                        logging.warning(err)
-                        # # Remove overlay DB status
-                        # if storage_helper.remove_overlay(
-                        #         overlayid, tenantid) is not True:
-                        #     logging.error(
-                        #         'Cannot remove overlay. Inconsistent data')
-                        return OverlayServiceReply(
-                            status=Status(code=status_code, reason=err)
-                        )
-                    # Add reverse action to the rollback stack
-                    rollback.push(
-                        func=tunnel_mode.remove_slice_from_overlay_2_0,
-                        overlayid=overlayid,
-                        overlay_name=overlay_name,
+
+                    
+                    # Check if the interface is already added 
+                    # (we dont want to add routes to local subnets in the main routing table twice)                    
+                    lan_interface_already_added = storage_helper.is_lan_interfaces_added_to_overlay(
                         deviceid=deviceid,
-                        interface_name=lan_interface_name,
-                        tenantid=tenantid,
-                        overlay_info=tunnel_info
-                    )
+                        tenantid=tenantid, 
+                        lan_interface_name=lan_interface_name
+                        )
+                    
+
+                    
+                    if not lan_interface_already_added:
+                        
+
+                        # # FIXME remove this just logging -----------------------------------------------------------
+                        # logging.info('\n\n\nAdding routes to local subnets in the main routing table\n\n\n')
+                        # time.sleep(3)
+                        # # FIXME remove this just logging -----------------------------------------------------------
+
+
+                        # Add the routes to local subnets assiciated with the lan_interface in the main routing table 
+                        status_code = tunnel_mode.add_slice_to_overlay_2_0(
+                            overlayid,
+                            overlay_name,
+                            deviceid,
+                            lan_interface_name,
+                            tenantid,
+                            tunnel_info
+                        )
+                        if status_code == STATUS_OK:
+                            storage_helper.update_device_lan_interfaces_added_to_overlay(
+                                deviceid=deviceid, tenantid=tenantid, lan_interface_name=lan_interface_name)
+                        else:
+                            err = (
+                                '1 Cannot add slice to overlay (overlay %s, '
+                                'device %s, slice %s, tenant %s)' %
+                                (overlay_name, deviceid, lan_interface_name, tenantid)
+                            )
+                            logging.warning(err)
+                            # # Remove overlay DB status
+                            # if storage_helper.remove_overlay(
+                            #         overlayid, tenantid) is not True:
+                            #     logging.error(
+                            #         'Cannot remove overlay. Inconsistent data')
+                            return OverlayServiceReply(
+                                status=Status(code=status_code, reason=err)
+                            )
+                        
+                        # Add reverse action to the rollback stack
+                        rollback.push(
+                            func=tunnel_mode.remove_slice_from_overlay_2_0,
+                            overlayid=overlayid,
+                            overlay_name=overlay_name,
+                            deviceid=deviceid,
+                            interface_name=lan_interface_name,
+                            tenantid=tenantid,
+                            overlay_info=tunnel_info
+                        )
+                    
+
+                    
                     
                     # Create the tunnel between all the pairs of interfaces
                     for site2 in configured_slices:
