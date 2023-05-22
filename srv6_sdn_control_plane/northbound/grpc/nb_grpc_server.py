@@ -1466,15 +1466,6 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                 # Extract the overlay name from the intent
                 overlay_name = intent.overlay_name
 
-
-
-                # FIXME Remove this just logging -----------------------------------------------------------------------
-                # logging.info("\n\n ###################################### INTENT : ")
-                # logging.info(intent)
-                # ("###################################################################")
-                # ------------------------------------------------------------------------------------------------------
-
-
                 # Extract the interfaces
                 slices = list()
                 _devices = set()
@@ -1493,7 +1484,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                     )
                     # Add the device to the devices set
                     _devices.add(deviceid)
-                
+
                 # Extract tunnel mode
                 tunnel_name = intent.tunnel_mode
                 # Extract tunnel info

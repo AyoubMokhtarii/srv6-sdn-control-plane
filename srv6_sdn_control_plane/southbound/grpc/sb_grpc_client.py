@@ -1298,6 +1298,69 @@ class SRv6Manager:
         return response
 
 
+    # CRUD IPTables rules 
+    def create_iptables_rule(self, server_ip, server_port, table, chain, target_name, target_value='',
+                            protocol='',source_ip='', destination_ip='', 
+                            source_port='', destination_port=''):
+        # Create message request
+        srv6_request = srv6_manager_pb2.SRv6ManagerRequest()
+        # Set the type of the carried entity
+        srv6_request.entity_type = srv6_manager_pb2.IPTablesRule
+
+        # Create a new iptables request
+        iptables_request = srv6_request.iptables_rule_request
+        
+        # Create a new iptables rule
+        iptables_rule = iptables_request.rules.add()
+
+        # Set params
+        iptables_rule.table = text_type(table)
+        iptables_rule.chain = text_type(chain)
+        iptables_rule.target_name = text_type(target_name)
+
+        
+
+        # FIXME add more validation for target_value
+        if target_value is not None and target_value != '':
+            iptables_rule.target_value = text_type(target_value) 
+
+        if protocol is not None and protocol != '':
+            iptables_rule.protocol = text_type(protocol)
+        
+        if source_ip is not None and source_ip != '':
+            iptables_rule.source_ip = text_type(source_ip)
+        
+        if destination_ip is not None and destination_ip != '':
+            iptables_rule.destination_ip = text_type(destination_ip)
+
+        if source_port is not None and source_port != '':
+            iptables_rule.source_port = text_type(source_port)
+        
+        if destination_port is not None and destination_port != '':
+            iptables_rule.destination_port = text_type(destination_port)
+        
+        try:
+            # Get the reference of the stub
+            srv6_stub, channel = self.get_grpc_session(
+                server_ip, server_port
+            )
+            # Remove ip tunnel
+            response = srv6_stub.Create(srv6_request)
+            # Create the response
+            response = response.status
+        except grpc.RpcError as e:
+            response = parse_grpc_error(e)
+        # Let's close the session
+        channel.close()
+        # Return the response
+        return response
+
+    
+    def remove_iptables_rule(self, server_ip, server_port, table, chain,):
+        raise NotImplementedError
+    
+
+
 class NetworkEventsListener:
 
     def __init__(self, secure=DEFAULT_SECURE, certificate=DEFAULT_CERTIFICATE):
