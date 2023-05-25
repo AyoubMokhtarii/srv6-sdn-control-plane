@@ -600,7 +600,7 @@ class SRv6Manager:
     def create_iprule(self, server_ip, server_port, family, table=-1,
                       priority=-1, action="", scope=-1,
                       destination="", dst_len=-1, source="",
-                      src_len=-1, in_interface="", out_interface=""):
+                      src_len=-1, in_interface="", out_interface="", fwmark=-1):
         # Create message request
         srv6_request = srv6_manager_pb2.SRv6ManagerRequest()
         # Set the type of the carried entity
@@ -621,6 +621,7 @@ class SRv6Manager:
         rule.src_len = int(src_len)
         rule.in_interface = text_type(in_interface)
         rule.out_interface = text_type(out_interface)
+        rule.fwmark = int(fwmark)
         try:
             # Get the reference of the stub
             srv6_stub, channel = self.get_grpc_session(
@@ -1301,7 +1302,9 @@ class SRv6Manager:
     # CRUD IPTables rules 
     def create_iptables_rule(self, server_ip, server_port, table, chain, target_name, target_value='',
                             protocol='',source_ip='', destination_ip='', 
-                            source_port='', destination_port=''):
+                            source_port='', destination_port='', rule_match={},
+                            ):
+        
         # Create message request
         srv6_request = srv6_manager_pb2.SRv6ManagerRequest()
         # Set the type of the carried entity
@@ -1338,6 +1341,17 @@ class SRv6Manager:
         
         if destination_port is not None and destination_port != '':
             iptables_rule.destination_port = text_type(destination_port)
+
+        if rule_match is not None and rule_match != {}:
+            iptables_rule.match.match_name = text_type(rule_match['match_name'])
+            for attribute in rule_match['match_attributes']:
+                match_att = iptables_rule.match.match_attributes.add()
+                match_att.attribute_name = str(attribute['attribute_name'])
+                match_att.attribute_value = str(attribute['attribute_value'])
+            
+
+
+            
         
         try:
             # Get the reference of the stub

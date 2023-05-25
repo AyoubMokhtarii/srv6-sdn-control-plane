@@ -299,6 +299,8 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
     """ Enable a device """
 
     def EnableDevice(self, request, context):
+
+
         logging.debug('EnableDevice request received: %s' % request)
         # Iterates on each device
         for device in request.devices:
@@ -1402,53 +1404,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
         # Create the response
         return OverlayServiceReply(status=Status(code=code, reason=reason))
 
-  
-  
-  
-  
-  
-  
-  
-  
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  
-  
-  
-  
-  
-  
-  
-  
+    
     """Create a VPN from an intent received through the northbound interface"""
 # ----------------------------------------------------------------------------------------------------------------------
     def CreateOverlay(self, request, context):
@@ -2053,6 +2009,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                     overlay_type,
                     slices,
                     tenantid,
+                    underlay_wan_id,
                     tunnel_name,
                     transport_proto=transport_proto
                 )
@@ -2315,59 +2272,14 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
             # Success, commit all performed operations
             rollback.commitAll()
         logging.info('All the intents have been processed successfully\n\n')
+
+
         # Create the response
         return OverlayServiceReply(
             status=Status(code=STATUS_OK, reason='OK')
         )
 
 # ----------------------------------------------------------------------------------------------------------------------
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
     """Remove a VPN"""
@@ -4247,6 +4159,319 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
         )
         # Create the response
         return STATUS_OK
+
+
+    # """ Application Identifier """
+    # def CreateAppIdentifier(self, request, context):
+    #     # TODO This a naive implementation, we should add validations and error handling ect.
+
+
+    #     # Get request parameters
+    #     device_name = request.device_name
+    #     tenantid = request.tenantid
+    #     application_name = request.application_name
+    #     description = request.description
+    #     category = request.category
+    #     service_class = request.service_class
+    #     importance = request.importance
+    #     paths = request.paths
+
+    #     rules = request.rules
+    #     protocol = rules.protocol
+    #     source_ip = rules.source_ip
+    #     destination_ip = rules.destination_ip
+    #     source_port = rules.source_port
+    #     destination_port = rules.destination_port
+
+
+    #     # The rule will be added to the mangle table in the PREROUTING chain
+    #     table = "mangle"
+    #     chain = "PREROUTING"
+
+    #     # Get the device by name.
+    #     # For the first implementation we suppose that the Application defined,
+    #     # in the Identified is behind the device (in the local network of that edge).
+    #     device = storage_helper.get_device_by_name(device_name, tenantid)
+
+    #     # Check if the device exists
+    #     if device == None:
+    #         err = ('There is no device with name %s (tenantid %s)',device_name, tenantid)
+    #         logging.warning(err)
+    #         return OverlayServiceReply(
+    #             status=Status(code=STATUS_BAD_REQUEST, reason=err)
+    #         )
+
+    #     # Get the device id
+    #     deviceid = device['deviceid']
+
+    #     # Get the table id of the specific overlay
+    #     table_id = storage_helper.get_tableid_of_overlay_in_device(tenantid, deviceid, underlay_wan_id)
+
+    #     # Check if the overlay exists
+    #     if table_id == None:
+    #         err = ('There is no overlay created over the underlay %s in device %s (tenantid %s)',underlay_wan_id, deviceid, tenantid)
+    #         logging.warning(err)
+    #         return OverlayServiceReply(
+    #             status=Status(code=STATUS_BAD_REQUEST, reason=err)
+    #         )
+        
+    #     # The target is "MARK" in the mangle table
+    #     # target value to mark packets with the overlay tableid to route traffic matching the rule to the overlay
+    #     target_name = "MARK"
+    #     target_value = str(table_id)
+
+
+
+    #     response = self.srv6_manager.create_iptables_rule(device['mgmtip'],self.grpc_client_port,table=table ,
+    #                                             chain=chain, target_name=target_name,target_value=target_value,
+    #                                             protocol=protocol, source_ip=source_ip, destination_ip=destination_ip, 
+    #                                             source_port=source_port, destination_port=destination_port
+    #                                             )
+        
+    #     if response != SbStatusCode.STATUS_SUCCESS:
+    #         logging.warning("Cannot create iptables rule")
+    #         err = status_codes_pb2.STATUS_INTERNAL_ERROR
+    #         return OverlayServiceReply(
+    #                 status=Status(code=STATUS_INTERNAL_SERVER_ERROR, reason=err)
+    #             )
+        
+
+    #     specific_ip_rules___lowest_priority = storage_helper.decrement_and_get_specific_ip_rules___lowest_priority(deviceid= device["deviceid"], tenantid=tenantid)
+
+    #     # Create ip rule to route the traffic marked with target_value to the overlay
+    #     response = self.srv6_manager.create_iprule(
+    #         device['mgmtip'],
+    #         self.grpc_client_port,
+    #         table=target_value,
+    #         fwmark=target_value,
+    #         priority=specific_ip_rules___lowest_priority,
+    #         family=AF_INET
+    #         )
+        
+    #     if response != SbStatusCode.STATUS_SUCCESS:
+    #         # If the operation has failed, report an error message
+    #         err = (
+    #             'Cannot Create ip rule to route the traffic marked with target_value to the overlay fwmark %s ; table %s',
+    #             target_value,
+    #             target_value
+    #         )
+    #         logging.warning(err)
+    #         return OverlayServiceReply(
+    #                 status=Status(code=NbStatusCode.STATUS_INTERNAL_SERVER_ERROR, reason=err)
+    #             )
+
+
+    #     logging.info('All the intents have been processed successfully\n\n')
+    #     # Create the response
+    #     return OverlayServiceReply(
+    #         status=Status(code=STATUS_OK, reason='OK')
+    #     )
+
+
+    """ Application Identifier """
+    def CreateAppIdentifier(self, request, context):
+        # TODO This a naive implementation, we should add validations and error handling ect.
+
+        # Get request parameters
+        device_name = request.device_name
+        tenantid = request.tenantid
+        application_name = request.application_name
+        description = request.description
+        category = request.category
+        service_class = request.service_class
+        importance = request.importance
+        paths = request.paths
+
+        rules = request.rules
+        protocol = rules.protocol
+        source_ip = rules.source_ip
+        destination_ip = rules.destination_ip
+        source_port = rules.source_port
+        destination_port = rules.destination_port
+
+
+        # The rule will be added to the mangle table in the PREROUTING chain
+        table = "mangle"
+        chain = "PREROUTING"
+
+        # Get the device by name.
+        # For the first implementation we suppose that the Application defined,
+        # in the Identified is behind the device (in the local network of that edge).
+        device = storage_helper.get_device_by_name(device_name, tenantid)
+
+        # Check if the device exists
+        if device == None:
+            err = ('There is no device with name %s (tenantid %s)',device_name, tenantid)
+            logging.warning(err)
+            return OverlayServiceReply(
+                status=Status(code=STATUS_BAD_REQUEST, reason=err)
+            )
+
+        # Get the device id
+        deviceid = device['deviceid']
+
+
+        if paths == None or (len(paths)==0):
+            err = ('There is no path defined for the application %s ',application_name)
+            logging.warning(err)
+            return OverlayServiceReply(
+                status=Status(code=STATUS_BAD_REQUEST, reason=err)
+            )
+        
+      
+        if len(paths) == 1:
+            # Add the Traffic identifier rule to route the traffic through the overlay (the overlay over the underlay_wan_id== path[0])
+            # Get the table id of the specific overlay
+            underlay_wan_id = paths[0]
+            table_id = storage_helper.get_tableid_of_overlay_in_device(tenantid, deviceid, underlay_wan_id)
+            
+            # Check if the overlay exists
+            if table_id == None:
+                err = ('There is no overlay created over the underlay %s in device %s (tenantid %s)',underlay_wan_id, deviceid, tenantid)
+                logging.warning(err)
+                return OverlayServiceReply(
+                    status=Status(code=STATUS_BAD_REQUEST, reason=err)
+                )
+            
+            # The target is "MARK" in the mangle table
+            # target value to mark packets with the overlay tableid to route traffic matching the rule to the overlay
+            target_name = "MARK"
+            target_value = str(table_id)
+
+
+
+            response = self.srv6_manager.create_iptables_rule(device['mgmtip'],self.grpc_client_port,table=table ,
+                                                chain=chain, target_name=target_name,target_value=target_value,
+                                                protocol=protocol, source_ip=source_ip, destination_ip=destination_ip, 
+                                                source_port=source_port, destination_port=destination_port, rule_match = {}
+                                                )
+        
+            if response != SbStatusCode.STATUS_SUCCESS:
+                err = "Cannot create iptables rule"
+                logging.warning(err)
+                return OverlayServiceReply(
+                        status=Status(code=STATUS_INTERNAL_SERVER_ERROR, reason=err)
+                    )
+            
+            specific_ip_rules___lowest_priority = storage_helper.decrement_and_get_specific_ip_rules___lowest_priority(deviceid= device["deviceid"], tenantid=tenantid)
+
+            # Create ip rule to route the traffic marked with target_value to the overlay
+            response = self.srv6_manager.create_iprule(
+                device['mgmtip'],
+                self.grpc_client_port,
+                table=target_value,
+                fwmark=target_value,
+                priority=specific_ip_rules___lowest_priority,
+                family=AF_INET
+                )
+            
+            if response != SbStatusCode.STATUS_SUCCESS:
+                # If the operation has failed, report an error message
+                err = (
+                    'Cannot Create ip rule to route the traffic marked with target_value to the overlay fwmark %s ; table %s',
+                    target_value,
+                    target_value
+                )
+                logging.warning(err)
+                return OverlayServiceReply(
+                        status=Status(code=NbStatusCode.STATUS_INTERNAL_SERVER_ERROR, reason=err)
+                    )
+
+            
+
+        
+        elif len(paths) == 2:
+            # load balancing between the two paths
+            i = 0
+            for path in paths:
+                underlay_wan_id = path
+                table_id = storage_helper.get_tableid_of_overlay_in_device(tenantid, deviceid, underlay_wan_id)
+                # Check if the overlay exists
+                if table_id == None:
+                    err = ('There is no overlay created over the underlay %s in device %s (tenantid %s)',underlay_wan_id, deviceid, tenantid)
+                    logging.warning(err)
+                    return OverlayServiceReply(
+                        status=Status(code=STATUS_BAD_REQUEST, reason=err)
+                )
+                # The target is "MARK" in the mangle table
+                # target value to mark packets with the overlay tableid to route traffic matching the rule to the overlay
+                target_name = "MARK"
+                target_value = str(table_id)
+
+                for j in [1,2]:
+                    rule_match = dict()
+                    rule_match = {
+                        'match_name' : "statistic",
+                        'match_attributes': [
+                            {
+                                'attribute_name': "mode",
+                                'attribute_value': "nth"
+                            }, 
+                            {
+                                'attribute_name': "every",
+                                'attribute_value': "4"
+                            }, 
+                            {
+                                'attribute_name': "packet",
+                                'attribute_value': i
+                            }, 
+                        ]
+                    }
+
+                    response = self.srv6_manager.create_iptables_rule(device['mgmtip'],self.grpc_client_port,table=table ,
+                                                chain=chain, target_name=target_name,target_value=target_value,
+                                                protocol=protocol, source_ip=source_ip, destination_ip=destination_ip, 
+                                                source_port=source_port, destination_port=destination_port, rule_match = rule_match
+                                                )
+                    
+                    if response != SbStatusCode.STATUS_SUCCESS:
+                        err = "Cannot create iptables rule"
+                        logging.warning(err)
+                        return OverlayServiceReply(
+                                status=Status(code=STATUS_INTERNAL_SERVER_ERROR, reason=err)
+                            )
+
+                    
+                    i+=1 
+
+
+                specific_ip_rules___lowest_priority = storage_helper.decrement_and_get_specific_ip_rules___lowest_priority(deviceid= device["deviceid"], tenantid=tenantid)
+                # Create ip rule to route the traffic marked with target_value to the overlay
+                response = self.srv6_manager.create_iprule(
+                    device['mgmtip'],
+                    self.grpc_client_port,
+                    table=target_value,
+                    fwmark=target_value,
+                    priority=specific_ip_rules___lowest_priority,
+                    family=AF_INET
+                    )
+                
+                if response != SbStatusCode.STATUS_SUCCESS:
+                    # If the operation has failed, report an error message
+                    err = (
+                        'Cannot Create ip rule to route the traffic marked with target_value to the overlay fwmark %s ; table %s',
+                        target_value,
+                        target_value
+                    )
+                    logging.warning(err)
+                    return OverlayServiceReply(
+                            status=Status(code=NbStatusCode.STATUS_INTERNAL_SERVER_ERROR, reason=err)
+                        )
+
+        else :
+            raise NotImplementedError("The implementation of load balancing for more than 2 paths is not implemented yet.")
+        
+        
+
+
+        logging.info('All the intents have been processed successfully\n\n')
+        # Create the response
+        return OverlayServiceReply(
+            status=Status(code=STATUS_OK, reason='OK')
+        )
+
+
+
 
 
 def create_server(grpc_server_ip=DEFAULT_GRPC_SERVER_IP,

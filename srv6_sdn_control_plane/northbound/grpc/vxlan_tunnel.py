@@ -125,12 +125,14 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
         # ------------------------------
 
 
+        local_site_deviceid = l_slice['deviceid']
+        remote_site_deviceid = r_slice['deviceid']
 
 
 
         # get management IP address for local and remote site
-        mgmt_ip_local_site = storage_helper.get_router_mgmtip(l_slice['deviceid'], tenantid)
-        mgmt_ip_remote_site = storage_helper.get_router_mgmtip(r_slice['deviceid'], tenantid)
+        mgmt_ip_local_site = storage_helper.get_router_mgmtip(local_site_deviceid, tenantid)
+        mgmt_ip_remote_site = storage_helper.get_router_mgmtip(remote_site_deviceid, tenantid)
 
 
         # # FIXME remove logging ------------------------------
@@ -364,6 +366,7 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
 
 
 
+
         # set route in remote site for the local subnet, if not present
         for lan_sub_local_site in lan_sub_local_sites:
             lan_sub_local_site = lan_sub_local_site['subnet']
@@ -389,11 +392,35 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
 
 
 
+
+        # Get the defualt_ip_rules lowest priority in the local site edge device
+        default_ip_rules___lowest_priority_local_site = storage_helper.decrement_and_get_default_ip_rules___lowest_priority(deviceid=local_site_deviceid, tenantid=tenantid)
+        
+
+        # Get the defualt_ip_rules lowest priority in the remote site edge device
+        default_ip_rules___lowest_priority_remote_site = storage_helper.decrement_and_get_default_ip_rules___lowest_priority(deviceid=remote_site_deviceid, tenantid=tenantid)
+
+        
+        if default_ip_rules___lowest_priority_local_site ==None:
+            logger.warning(
+                'Cannot Get the defualt_ip_rules lowest priority in the local site %s',local_site_deviceid)
+            return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+        
+        if default_ip_rules___lowest_priority_remote_site ==None:
+            logger.warning(
+                'Cannot Get the defualt_ip_rules lowest priority in the remote site %s',remote_site_deviceid)
+            return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+        
+
+
+
+
         # Add the default ip rule to lookup for the tunnel table -  remote site 
         response = self.srv6_manager.create_iprule(
             mgmt_ip_remote_site,
             self.grpc_client_port,
             table=tableid,
+            priority=default_ip_rules___lowest_priority_remote_site,
             family=AF_INET)
         if response != SbStatusCode.STATUS_SUCCESS:
             # If the operation has failed, report an error message
@@ -403,13 +430,16 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
                 mgmt_ip_remote_site
             )
             return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
-        
+
+
+
 
         # Add the default ip rule to lookup for the tunnel table -  local site 
         response = self.srv6_manager.create_iprule(
             mgmt_ip_local_site,
             self.grpc_client_port,
             table=tableid,
+            priority=default_ip_rules___lowest_priority_local_site,
             family=AF_INET)
         if response != SbStatusCode.STATUS_SUCCESS:
             # If the operation has failed, report an error message

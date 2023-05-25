@@ -400,6 +400,65 @@ class NorthboundInterface:
         # Return the response
         return response
 
+
+    def create_application_identifier(self, device_name, tenantid, application_name='', description='', category='', service_class='', importance='', pathss=[], rules={}, match={}):
+
+        # TODO should improve error handling and parameters validation
+
+        # Create request
+        request = srv6_vpn_pb2.ApplicationIdentifier()
+        request.device_name = device_name
+        request.tenantid = tenantid
+        request.application_name = application_name
+        request.description = description
+        request.category = category
+        request.service_class = service_class
+        request.importance = importance
+      
+
+        paths = list()
+        for path in pathss:
+            paths.append(str(path))
+        request.paths.extend(paths)
+
+
+ 
+
+        request.rules.source_ip = rules['source_ip']
+        request.rules.destination_ip = rules['destination_ip']
+        request.rules.protocol = rules['protocol']
+        request.rules.source_port = rules['source_port']
+        request.rules.destination_port = rules['destination_port']
+        
+
+        if match is not None and match != {}:
+            request.matches.match_name = str(match['match_name'])
+
+            for attribute in match['match_attributes']:
+                match_att = request.matches.match_attributes.add()
+                match_att.attribute_name = str(attribute['attribute_name'])
+                match_att.attribute_value = str(attribute['attribute_value'])
+
+
+        try:
+            # Get the reference of the stub
+            srv6_vpn_stub, channel = self.get_grpc_session(
+                self.server_ip, self.server_port, self.SECURE)
+            # Configure the tenant
+            response = srv6_vpn_stub.CreateAppIdentifier(request)
+            # Create the response
+            response = response.status.code, response.status.reason
+        except grpc.RpcError as e:
+            response = parse_grpc_error(e, self.server_ip, self.server_port)
+        # Let's close the session
+        channel.close()
+        # Return the response
+        return response
+
+
+
+
+
     def get_topology_information(self):
         # Create the request
         request = srv6_vpn_pb2.InventoryServiceRequest()
