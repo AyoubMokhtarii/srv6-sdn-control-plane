@@ -59,6 +59,12 @@ from srv6_sdn_proto.srv6_vpn_pb2 import TenantReply, OverlayServiceReply
 from srv6_sdn_proto.srv6_vpn_pb2 import InventoryServiceReply
 from srv6_sdn_proto.srv6_vpn_pb2 import GetSIDListsReply
 
+# from srv6_sdn_control_plane.monitoring_system.delay_monitor import DelayMonitor
+from srv6_sdn_control_plane.monitoring_system.delay_monitor import NetworkDelayMonitoring
+
+
+from srv6_sdn_control_plane.monitoring_system.traffic_monitor import TrafficMonitor
+
 # STAMP Support
 ENABLE_STAMP_SUPPORT = True
 
@@ -145,7 +151,10 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                  srv6_manager=None,
                  southbound_interface=DEFAULT_SB_INTERFACE,
                  verbose=DEFAULT_VERBOSE,
-                 stamp_controller=None):
+                 stamp_controller=None,
+                 delay_monitor_singleton=None,
+                 traffic_monitor_singleton=None,
+                 ):
         # Port of the gRPC client
         self.grpc_client_port = grpc_client_port
         # Verbose mode
@@ -161,6 +170,12 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
             grpc_client_port, verbose
         ).tunnel_modes
         self.supported_tunnel_modes = [t_mode for t_mode in self.tunnel_modes]
+
+        # Delay monitor singleton
+        self.delay_monitor_singleton = delay_monitor_singleton
+        # Traffic monitor singleton
+        self.traffic_monitor_singleton = traffic_monitor_singleton
+
         logging.info(
             '*** Supported tunnel modes: %s' % self.supported_tunnel_modes
         )
@@ -2030,6 +2045,29 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                     tenantid=tenantid
                 )
 
+
+                # Get the overlay_ip_net_index 
+                # an index used to calculate the overlay base ip network 
+                success = storage_helper.increment_overlay_ip_net_index(tenantid)
+                if not success:
+                    err = 'Cannot increment overlay_ip_net_index'
+                    logging.error(err)
+                    return OverlayServiceReply(
+                        status=Status(
+                            code=STATUS_INTERNAL_SERVER_ERROR,
+                            reason=err
+                        )
+                    )
+                
+                # # FIXME remove this just for logging -----------------------------------
+                # overlay_ip_net_index = storage_helper.get_overlay_ip_net_index(tenantid)
+                # logging.info("\n\n\n\n\n\n\n\n\n\n\n\n\n\n")
+                # logging.info('overlay_ip_net_index')
+                # logging.info(overlay_ip_net_index)
+                # logging.info("\n\n\n\n\n\n\n\n\n\n\n\n\n\n")
+                # # FIXME remove this just for logging -----------------------------------
+
+
                 # Get tunnel mode
                 tunnel_mode = self.tunnel_modes[tunnel_name]
 
@@ -2099,8 +2137,9 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                             tenantid=tenantid
                         )
                         status_code = tunnel_mode.init_tunnel_mode_2_0(
-                            deviceid, tenantid, tunnel_info
+                            deviceid=deviceid, tenantid=tenantid, overlay_info=tunnel_info, overlayid=overlayid
                         )
+                        
                         if status_code != STATUS_OK:
                             err = (
                                 'Cannot initialize tunnel mode (device %s '
@@ -2167,7 +2206,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
 
                     
                     # Check if the interface is already added 
-                    # (we dont want to add routes to local subnets in the main routing table twice)                    
+                    # (we dont want to add routes to local subnets in the main routing table more than once )                    
                     lan_interface_already_added = storage_helper.is_lan_interfaces_added_to_overlay(
                         deviceid=deviceid,
                         tenantid=tenantid, 
@@ -4161,113 +4200,6 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
         return STATUS_OK
 
 
-    # """ Application Identifier """
-    # def CreateAppIdentifier(self, request, context):
-    #     # TODO This a naive implementation, we should add validations and error handling ect.
-
-
-    #     # Get request parameters
-    #     device_name = request.device_name
-    #     tenantid = request.tenantid
-    #     application_name = request.application_name
-    #     description = request.description
-    #     category = request.category
-    #     service_class = request.service_class
-    #     importance = request.importance
-    #     paths = request.paths
-
-    #     rules = request.rules
-    #     protocol = rules.protocol
-    #     source_ip = rules.source_ip
-    #     destination_ip = rules.destination_ip
-    #     source_port = rules.source_port
-    #     destination_port = rules.destination_port
-
-
-    #     # The rule will be added to the mangle table in the PREROUTING chain
-    #     table = "mangle"
-    #     chain = "PREROUTING"
-
-    #     # Get the device by name.
-    #     # For the first implementation we suppose that the Application defined,
-    #     # in the Identified is behind the device (in the local network of that edge).
-    #     device = storage_helper.get_device_by_name(device_name, tenantid)
-
-    #     # Check if the device exists
-    #     if device == None:
-    #         err = ('There is no device with name %s (tenantid %s)',device_name, tenantid)
-    #         logging.warning(err)
-    #         return OverlayServiceReply(
-    #             status=Status(code=STATUS_BAD_REQUEST, reason=err)
-    #         )
-
-    #     # Get the device id
-    #     deviceid = device['deviceid']
-
-    #     # Get the table id of the specific overlay
-    #     table_id = storage_helper.get_tableid_of_overlay_in_device(tenantid, deviceid, underlay_wan_id)
-
-    #     # Check if the overlay exists
-    #     if table_id == None:
-    #         err = ('There is no overlay created over the underlay %s in device %s (tenantid %s)',underlay_wan_id, deviceid, tenantid)
-    #         logging.warning(err)
-    #         return OverlayServiceReply(
-    #             status=Status(code=STATUS_BAD_REQUEST, reason=err)
-    #         )
-        
-    #     # The target is "MARK" in the mangle table
-    #     # target value to mark packets with the overlay tableid to route traffic matching the rule to the overlay
-    #     target_name = "MARK"
-    #     target_value = str(table_id)
-
-
-
-    #     response = self.srv6_manager.create_iptables_rule(device['mgmtip'],self.grpc_client_port,table=table ,
-    #                                             chain=chain, target_name=target_name,target_value=target_value,
-    #                                             protocol=protocol, source_ip=source_ip, destination_ip=destination_ip, 
-    #                                             source_port=source_port, destination_port=destination_port
-    #                                             )
-        
-    #     if response != SbStatusCode.STATUS_SUCCESS:
-    #         logging.warning("Cannot create iptables rule")
-    #         err = status_codes_pb2.STATUS_INTERNAL_ERROR
-    #         return OverlayServiceReply(
-    #                 status=Status(code=STATUS_INTERNAL_SERVER_ERROR, reason=err)
-    #             )
-        
-
-    #     specific_ip_rules___lowest_priority = storage_helper.decrement_and_get_specific_ip_rules___lowest_priority(deviceid= device["deviceid"], tenantid=tenantid)
-
-    #     # Create ip rule to route the traffic marked with target_value to the overlay
-    #     response = self.srv6_manager.create_iprule(
-    #         device['mgmtip'],
-    #         self.grpc_client_port,
-    #         table=target_value,
-    #         fwmark=target_value,
-    #         priority=specific_ip_rules___lowest_priority,
-    #         family=AF_INET
-    #         )
-        
-    #     if response != SbStatusCode.STATUS_SUCCESS:
-    #         # If the operation has failed, report an error message
-    #         err = (
-    #             'Cannot Create ip rule to route the traffic marked with target_value to the overlay fwmark %s ; table %s',
-    #             target_value,
-    #             target_value
-    #         )
-    #         logging.warning(err)
-    #         return OverlayServiceReply(
-    #                 status=Status(code=NbStatusCode.STATUS_INTERNAL_SERVER_ERROR, reason=err)
-    #             )
-
-
-    #     logging.info('All the intents have been processed successfully\n\n')
-    #     # Create the response
-    #     return OverlayServiceReply(
-    #         status=Status(code=STATUS_OK, reason='OK')
-    #     )
-
-
     """ Application Identifier """
     def CreateAppIdentifier(self, request, context):
         # TODO This a naive implementation, we should add validations and error handling ect.
@@ -4347,11 +4279,17 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                                                 )
         
             if response != SbStatusCode.STATUS_SUCCESS:
-                err = "Cannot create iptables rule"
+                err = "Cannot create iptables rule [1]"
                 logging.warning(err)
                 return OverlayServiceReply(
                         status=Status(code=STATUS_INTERNAL_SERVER_ERROR, reason=err)
                     )
+            
+
+            
+            
+
+
             
             specific_ip_rules___lowest_priority = storage_helper.decrement_and_get_specific_ip_rules___lowest_priority(deviceid= device["deviceid"], tenantid=tenantid)
 
@@ -4469,7 +4407,129 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
         return OverlayServiceReply(
             status=Status(code=STATUS_OK, reason='OK')
         )
+    
 
+
+    def GetTunnelsTrafficStatistics(self, request, context):
+        
+        tenantid = "1"
+        device_name = "ewED1"
+
+        device = storage_helper.get_device_by_name(device_name, tenantid)
+
+        # Check if the device exists
+        if device == None:
+            err = ('There is no device with name %s (tenantid %s)',device_name, tenantid)
+            logging.warning(err)
+            return OverlayServiceReply(
+                status=Status(code=STATUS_BAD_REQUEST, reason=err)
+            )
+
+        response, stats = self.srv6_manager.get_iptables_statistics(device['mgmtip'],self.grpc_client_port,table=None, chain=None)
+
+
+
+        # # FIXME remove this just logging ----------------------------------------------------------------------------------
+        # logging.info("\n\n\n =========================================== ewED1 Traffic Statistics =========================================== \n\n\n")
+        # for stat in stats:
+        #     logging.info(stat['packet_count'])
+        #     logging.info(stat['byte_count'])
+        #     logging.info(stat['rule_mark_value'])
+        #     logging.info("\n")
+
+        # logging.info("\n\n\n =========================================== ewED1 Traffic Statistics =========================================== \n\n\n")
+
+        # # FIXME remove this just logging ----------------------------------------------------------------------------------
+
+
+
+
+
+
+
+        # # FIXME remove this just trying the tunnel delay  ----------------------------------------------------------------------------------
+        # tunnel = dict()
+        # tunnels = []
+        # tunnel['tunnel_interface_name'] = 'vxlan-2'
+        # tunnel['tunnel_dst_endpoint'] = '198.18.0.2'
+        # tunnels.append(tunnel)
+
+
+        # response, stats = self.srv6_manager.get_tunnel_delay(server_ip=device['mgmtip'],server_port =self.grpc_client_port, tunnels =tunnels)
+
+        # logging.info("\n\n\n =========================================== ewED1 delay Statistics =========================================== \n\n\n")
+        
+        # logging.info(len(stats))
+        # for stat in stats:
+        #     logging.info(stat['tunnel_interface_name'])
+        #     logging.info(stat['tunnel_dst_endpoint'])
+        #     logging.info(stat['tunnel_delay'])
+
+        # logging.info("\n\n\n =========================================== ewED1 delay Statistics =========================================== \n\n\n")
+
+        
+        # FIXME remove this just logging ----------------------------------------------------------------------------------
+        
+
+
+        if response != SbStatusCode.STATUS_SUCCESS:
+            err = "Cannot get iptables statistics"
+            logging.warning(err)
+            return OverlayServiceReply(
+                    status=Status(code=STATUS_INTERNAL_SERVER_ERROR, reason=err)
+                )
+        
+
+        logging.info('All the intents have been processed successfully\n\n')
+        return OverlayServiceReply(
+            status=Status(code=STATUS_OK, reason='OK')
+        )
+
+
+
+    # Monitoring System Nb API
+    def StartDelayMonitor(self, request, context):
+        
+        success = self.delay_monitor_singleton.start()
+        if not success:
+            err = "Cannot start delay monitor"
+            logging.warning(err)
+            return OverlayServiceReply(
+                    status=Status(code=STATUS_INTERNAL_SERVER_ERROR, reason=err)
+                )
+        
+
+        return OverlayServiceReply(
+            status=Status(code=STATUS_OK, reason='OK')
+        )
+        
+    def StopDelayMonitor(self, request, context):
+        success = self.delay_monitor_singleton.stop()
+        if not success:
+            err = "Cannot stop delay monitor"
+            logging.warning(err)
+            return OverlayServiceReply(
+                    status=Status(code=STATUS_INTERNAL_SERVER_ERROR, reason=err)
+                )
+        
+
+        return OverlayServiceReply(
+            status=Status(code=STATUS_OK, reason='OK')
+        )
+
+    def StartTrafficMonitor(self, request, context):
+        # self.traffic_monitor_singleton.start()
+        raise NotImplementedError()
+
+    def StopTrafficMonitor(self, request, context):
+        # self.traffic_monitor_singleton.stop()
+        raise NotImplementedError()
+
+    def GetDelayMonitoringStats(self, request, context):
+        raise NotImplementedError("The implementation of get_delay_monitoring_stats is not implemented yet.")
+
+    def GetTrafficMonitoringStats(self, request, context):
+        raise NotImplementedError("The implementation of get_traffic_monitoring_stats is not implemented yet.")
 
 
 
@@ -4494,6 +4554,7 @@ def create_server(grpc_server_ip=DEFAULT_GRPC_SERVER_IP,
     #    vpn_dict=vpn_dict,
     #    vpn_file=vpn_file
     # )
+
     # Create SRv6 Manager
     srv6_manager = sb_grpc_client.SRv6Manager(
         secure=sb_secure, certificate=client_certificate
@@ -4511,13 +4572,27 @@ def create_server(grpc_server_ip=DEFAULT_GRPC_SERVER_IP,
             storage='mongodb',
             mongodb_client=mongodb_client
         )
+
+
+     # Init the Monitoring system instances
+    # Init the delay monitor singleton
+    # delay_monitor_singleton = DelayMonitor(srv6_manager=srv6_manager, grpc_client_port=grpc_client_port)
+    delay_monitor_singleton = NetworkDelayMonitoring(srv6_manager=srv6_manager, grpc_client_port=grpc_client_port)
+
+    # Init the traffic monitor singleton
+    traffic_monitor_singleton = TrafficMonitor(srv6_manager=srv6_manager, grpc_client_port=grpc_client_port)
+
+
     # Initialize the Northbound Interface
+
     service = NorthboundInterface(
         grpc_client_port,
         srv6_manager,
         southbound_interface,
         verbose,
-        stamp_controller
+        stamp_controller,
+        delay_monitor_singleton,
+        traffic_monitor_singleton,
     )
     srv6_vpn_pb2_grpc.add_NorthboundInterfaceServicer_to_server(
         service, grpc_server
@@ -4543,6 +4618,11 @@ def create_server(grpc_server_ip=DEFAULT_GRPC_SERVER_IP,
         grpc_server.add_insecure_port(
             '[%s]:%s' % (grpc_server_ip, grpc_server_port)
         )
+
+
+   
+
+
     return grpc_server, service
 
 

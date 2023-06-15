@@ -113,6 +113,7 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
 
     def create_tunnel(self, overlayid, overlay_name, overlay_type,
                       l_slice, r_slice, tenantid, overlay_info):
+        
         # get devices ID
         id_remote_site = r_slice['deviceid']
         id_local_site = l_slice['deviceid']
@@ -450,6 +451,72 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
             
             return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
         
+
+
+        
+
+
+        # FIXME remove this just for logging --------------------------------------------------
+        # rule_match = {
+        #                 'match_name' : "mark",
+        #                 'match_attributes': [
+        #                     {
+        #                         'attribute_name': "mark",
+        #                         'attribute_value': str(tableid)
+        #                     },]
+        #             }
+        # FIXME remove this just for logging --------------------------------------------------
+
+
+
+
+        # ADD iptables rule to FORWARD chain in mangle table - local site
+        # Used for counting the traffic going through the tunnel
+        response = self.srv6_manager.create_iptables_rule(mgmt_ip_local_site, self.grpc_client_port, table= 'mangle',
+                                            chain='FORWARD', target_name='ACCEPT', out_interface=vtep_name)
+        
+        if response != SbStatusCode.STATUS_SUCCESS:
+            err = "Cannot create iptables rule [local site]"
+            logging.warning(err)
+            return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+        
+
+
+
+        # ADD iptables rule to FORWARD chain in mangle table - remote site
+        # Used for counting the traffic going through the tunnel
+        response = self.srv6_manager.create_iptables_rule(mgmt_ip_remote_site, self.grpc_client_port, table= 'mangle',
+                                            chain='FORWARD', target_name='ACCEPT', out_interface=vtep_name)
+        
+        if response != SbStatusCode.STATUS_SUCCESS:
+            err = "Cannot create iptables rule [remote site]"
+            logging.warning(err)
+            return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+        
+
+
+
+
+        # Update the tunnel_mode virtual interfaces in the local site (in database)
+        success = storage_helper.update_tunnel_mode_interfaces(tenantid=tenantid, deviceid=id_local_site,
+                                            tunnel_mode_name=self.name, tunnel_interface_name=vtep_name ,
+                                            tunnel_dst_endpoint= vtep_ip_remote_site)
+        
+        if not success:
+            err = "Cannot Update the tunnel_mode virtual interfaces in the local site"
+            logging.warning(err)
+            return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+
+        # Update the tunnel_mode virtual interfaces in the remote site edge device (in database)
+        success = storage_helper.update_tunnel_mode_interfaces(tenantid=tenantid, deviceid=id_remote_site,
+                                            tunnel_mode_name=self.name, tunnel_interface_name=vtep_name ,
+                                            tunnel_dst_endpoint= vtep_ip_local_site)
+        
+        if not success:
+            err = "Cannot Update the tunnel_mode virtual interfaces in the remote site"
+            logging.warning(err)
+            return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+
 
 
 
@@ -858,16 +925,44 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
 
 
 
-    def init_tunnel_mode_2_0(self, deviceid, tenantid, overlay_info):
+    def init_tunnel_mode_2_0(self, deviceid, tenantid, overlay_info, overlayid):
+
+
+
+
+
+
+        # # FIXME remove this just logging -----------------------------------
+        # vtep_ip_site_test = storage_helper.get_new_vtep_ip_unique_2(deviceid, tenantid, overlayid, overlay_ip_net_index)
+        
+        # logging.info("\n\n\n\n\n\n\n\n\n\n\n\n\n\n")
+        # logging.info("overlayid")
+        # logging.info(overlayid)
+        # logging.info('vtep_ip_site_test')
+        # logging.info(vtep_ip_site_test)
+
+        # logging.info("\n\n\n\n\n\n\n\n\n\n\n\n\n\n")
+
+        # # FIXME remove this just logging -----------------------------------
+
+
+
+
+
+
+
+
+        overlay_ip_net_index = storage_helper.get_overlay_ip_net_index(tenantid)
+
         # get VTEP IP address for site1
-        vtep_ip_site = storage_helper.get_new_vtep_ip_unique(
-            deviceid, tenantid
+        vtep_ip_site = storage_helper.get_new_vtep_ip_unique_2(
+            deviceid, tenantid, overlayid, overlay_ip_net_index
         )
 
         # FIXME remove this just logging -----------------------------------
-        logging.info("\n\n_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*get_new_vtep_ip_unique*_*_*_*_*_*_*_*_*_*_*_*__*_*_*_*_*_")
-        logging.info(vtep_ip_site)
-        logging.info("_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*__*_*_*_*_*_\n\n")
+        # logging.info("\n\n_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*get_new_vtep_ip_unique*_*_*_*_*_*_*_*_*_*_*_*__*_*_*_*_*_")
+        # logging.info(vtep_ip_site)
+        # logging.info("_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*__*_*_*_*_*_\n\n")
         # FIXME remove this just logging -----------------------------------
 
         vtep_ipv6_site = storage_helper.get_new_vtep_ipv6_unique(

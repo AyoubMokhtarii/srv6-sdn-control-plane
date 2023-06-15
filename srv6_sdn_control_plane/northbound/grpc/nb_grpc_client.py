@@ -456,6 +456,75 @@ class NorthboundInterface:
         return response
 
 
+    def get_tunnels_traffic_statistics(self, device_name, tenantid):
+
+        request = srv6_vpn_pb2.DeviceTunnelsTrafficStatsRequest()
+        request.tenantid = tenantid
+        request.device_name = device_name
+
+        try:
+            # Get the reference of the stub
+            srv6_vpn_stub, channel = self.get_grpc_session(
+                self.server_ip, self.server_port, self.SECURE)
+            # Configure the tenant
+            response = srv6_vpn_stub.GetTunnelsTrafficStatistics(request)
+            # Create the response
+            response = response.status.code, response.status.reason
+
+        except grpc.RpcError as e:
+            response = parse_grpc_error(e, self.server_ip, self.server_port)
+        # Let's close the session
+        channel.close()
+        # Return the response
+        return response
+
+
+    def start_delay_monitor(self):
+        # Create request
+        request = srv6_vpn_pb2.StartDelayMonitorRequest()
+
+        try:
+            # Get the reference of the stub
+            srv6_vpn_stub, channel = self.get_grpc_session(
+                self.server_ip, self.server_port, self.SECURE)
+            
+            response = srv6_vpn_stub.StartDelayMonitor(request)
+            # Create the response
+            response = response.status.code, response.status.reason
+
+        except grpc.RpcError as e:
+            response = parse_grpc_error(e, self.server_ip, self.server_port)
+        # Let's close the session
+        channel.close()
+        # Return the response
+        return response
+        
+
+    def stop_delay_monitor(self):
+        # Create request
+        request = srv6_vpn_pb2.StopDelayMonitorRequest()
+
+        try:
+            # Get the reference of the stub
+            srv6_vpn_stub, channel = self.get_grpc_session(
+                self.server_ip, self.server_port, self.SECURE)
+            
+            response = srv6_vpn_stub.StopDelayMonitor(request)
+            # Create the response
+            response = response.status.code, response.status.reason
+
+        except grpc.RpcError as e:
+            response = parse_grpc_error(e, self.server_ip, self.server_port)
+        
+        # Let's close the session
+        channel.close()
+        # Return the response
+        return response
+    
+
+
+
+
 
 
 

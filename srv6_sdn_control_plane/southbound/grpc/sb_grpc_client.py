@@ -1303,6 +1303,7 @@ class SRv6Manager:
     def create_iptables_rule(self, server_ip, server_port, table, chain, target_name, target_value='',
                             protocol='',source_ip='', destination_ip='', 
                             source_port='', destination_port='', rule_match={},
+                            in_interface='', out_interface='',
                             ):
         
         # Create message request
@@ -1342,6 +1343,11 @@ class SRv6Manager:
         if destination_port is not None and destination_port != '':
             iptables_rule.destination_port = text_type(destination_port)
 
+        if in_interface is not None and in_interface != '':
+            iptables_rule.in_interface = text_type(in_interface)
+        if out_interface is not None and out_interface != '':
+            iptables_rule.out_interface = text_type(out_interface)
+
         if rule_match is not None and rule_match != {}:
             iptables_rule.match.match_name = text_type(rule_match['match_name'])
             for attribute in rule_match['match_attributes']:
@@ -1373,6 +1379,143 @@ class SRv6Manager:
     def remove_iptables_rule(self, server_ip, server_port, table, chain,):
         raise NotImplementedError
     
+    def get_iptables_statistics(self, server_ip, server_port, table=None, chain=None):
+        
+        # Create message request
+        srv6_request = srv6_manager_pb2.SRv6ManagerRequest()
+        # Set the type of the carried entity
+        srv6_request.entity_type = srv6_manager_pb2.IPTablesRuleStatistics
+        try :
+            # Get the reference of the stub
+            srv6_stub, channel = self.get_grpc_session(
+                server_ip, server_port
+            )
+            response = srv6_stub.Get(srv6_request)
+
+            statistics = list()
+            for stat in response.iptables_rules_statistics:
+                statistics.append({
+                    'packet_count': stat.packet_count,
+                    'byte_count': stat.byte_count,
+                    'rule_mark_value': stat.rule_mark_value
+                })
+
+            response = response.status , statistics
+        
+        except grpc.RpcError as e:
+            response = parse_grpc_error(e)
+
+        channel.close()
+        return response
+
+
+    # def get_tunnel_delay(self, server_ip, server_port,tunnel_interface_name, tunnel_dst_endpoint, tunnel_src_endpoint=None):
+    def get_tunnel_delay(self, server_ip, server_port,tunnels=[]):
+
+        """
+        server_ip : the management ip address of the southbound server at the edge device.
+        server_port : the management port of the southbound server at the edge device.
+        tunnels : list of TunnelDelay dictionary : TunnelDelay = { 
+                                                              'tunnel_interface_name' : ... ,
+                                                              'tunnel_src_endpoint' : ... ,
+                                                              'tunnel_dst_endpoint' : ... , 
+                                                            }
+        """
+
+        
+        # Create message request
+        srv6_request = srv6_manager_pb2.SRv6ManagerRequest()
+        # Set the type of the carried entity
+        srv6_request.entity_type = srv6_manager_pb2.TunnelDelay
+
+        tunnel_request = srv6_request.tunnels_delay_request
+
+
+        for tunnel in tunnels:
+            tunnel_delay = tunnel_request.tunnels.add()
+            tunnel_delay.tunnel_interface_name = text_type(tunnel['tunnel_interface_name'])
+            tunnel_delay.tunnel_dst_endpoint = text_type(tunnel['tunnel_dst_endpoint'])
+            if 'tunnel_src_endpoint' in tunnel and tunnel['tunnel_src_endpoint'] is not None:
+                tunnel_delay.tunnel_src_endpoint = text_type(tunnel['tunnel_src_endpoint'])
+
+        
+
+        try :
+            # Get the reference of the stub
+            srv6_stub, channel = self.get_grpc_session(
+                server_ip, server_port
+            )
+            response = srv6_stub.Get(srv6_request)
+            tunnels_delay = list()
+            for tunnel_delay in response.tunnel_delay:
+                tunnels_delay.append(
+                    {
+                        'tunnel_interface_name' : tunnel_delay.tunnel_interface_name,
+                        'tunnel_src_endpoint' : tunnel_delay.tunnel_src_endpoint,
+                        'tunnel_dst_endpoint' : tunnel_delay.tunnel_dst_endpoint,
+                        'tunnel_delay' : tunnel_delay.tunnel_delay,
+                    }
+                )
+            
+            response = response.status , tunnels_delay
+
+
+            # FIXME remove this just for testing -----------------------
+            # logging.info("\n\n---tunnels_delay-----------------------------------------------------------------")
+            # logging.info(tunnels_delay)
+            # logging.info("--------------------------------------------------------------------\n\n")
+            # FIXME remove this just for testing -----------------------
+        
+        except grpc.RpcError as e:
+            response = parse_grpc_error(e)
+
+        channel.close()
+        return response
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
 
 
 class NetworkEventsListener:
