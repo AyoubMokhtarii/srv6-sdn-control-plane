@@ -201,6 +201,12 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
         # get VTEP name
         vtep_name = 'vxlan-%s' % (vni)
 
+        logging.info("\n\n=========================================================================\n\n")
+        logging.info("vni: %s", vni)
+        logging.info("vtep_name: %s", vtep_name)
+        logging.info("\n\n=========================================================================\n\n")
+
+
         
         # Check if the r_slice and l_slice are in the same underaly network 
         underlay_wan_id = None

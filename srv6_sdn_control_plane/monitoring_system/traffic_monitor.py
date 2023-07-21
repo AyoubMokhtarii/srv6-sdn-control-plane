@@ -14,7 +14,7 @@ class TrafficMonitor():
         self.grpc_client_port = grpc_client_port
 
     def start(self):
-        432/0
+        pass 
 
     def stop(self):
         pass

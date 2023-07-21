@@ -62,6 +62,7 @@ from srv6_sdn_proto.srv6_vpn_pb2 import GetSIDListsReply
 # from srv6_sdn_control_plane.monitoring_system.delay_monitor import DelayMonitor
 from srv6_sdn_control_plane.monitoring_system.delay_monitor import NetworkDelayMonitoring
 
+from srv6_sdn_control_plane.monitoring_system.traffic_adaptation import TrafficAdaptation
 
 from srv6_sdn_control_plane.monitoring_system.traffic_monitor import TrafficMonitor
 
@@ -154,6 +155,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                  stamp_controller=None,
                  delay_monitor_singleton=None,
                  traffic_monitor_singleton=None,
+                 traffic_adaptation_singleton=None
                  ):
         # Port of the gRPC client
         self.grpc_client_port = grpc_client_port
@@ -173,6 +175,10 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
 
         # Delay monitor singleton
         self.delay_monitor_singleton = delay_monitor_singleton
+
+        # Traffic adaptation singleton
+        self.traffic_adaptation_singleton = traffic_adaptation_singleton
+
         # Traffic monitor singleton
         self.traffic_monitor_singleton = traffic_monitor_singleton
 
@@ -288,6 +294,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
         return InventoryServiceReply(
             status=Status(code=STATUS_OK, reason='OK')
         )
+
 
     def enable_disable_device(self, deviceid, tenantid, enabled):
         # Enable/Disable the device
@@ -4212,7 +4219,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
         category = request.category
         service_class = request.service_class
         importance = request.importance
-        paths = request.paths
+        # paths = request.paths
 
         rules = request.rules
         protocol = rules.protocol
@@ -4243,6 +4250,56 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
         deviceid = device['deviceid']
 
 
+        
+        tmp_rules = {
+            'source_ip' : rules.source_ip,
+            'destination_ip' : rules.destination_ip,
+            'protocol' : rules.protocol,
+            'source_port' : rules.source_port,
+            'destination_port' : rules.destination_port
+        }
+        
+        path_selection_mode = request.paths.mode
+        
+        paths = request.paths.paths
+
+            
+        
+        if path_selection_mode == 'static':
+            pass
+
+        # Just save the application identifier in the database, the path selection will be done dynamically by traffic adaptation module.
+        elif path_selection_mode == 'dynamic':
+            policy = request.paths.policy
+
+            
+            paths = {
+                'mode' : path_selection_mode,
+                'policy' : policy, 
+                'delay_threshold' : request.paths.delay_threshold,
+            }
+
+
+            storage_helper.create_application_identifier(
+                    tenantid=tenantid, deviceid=deviceid,application_name=application_name,
+                    description=description, category=category, service_class=service_class,
+                    importance=importance, path=paths, rules=tmp_rules
+                )
+
+            logging.info('All the intents have been processed successfully\n\n')
+            # Create the response
+            return OverlayServiceReply(
+                status=Status(code=STATUS_OK, reason='OK')
+            )
+        else:
+            logging.error('Unknown path selection mode %s', path_selection_mode)
+            # Create the response
+            return OverlayServiceReply(
+                status=Status(code=STATUS_BAD_REQUEST, reason='Unknown path selection mode')
+            )
+        
+        
+
         if paths == None or (len(paths)==0):
             err = ('There is no path defined for the application %s ',application_name)
             logging.warning(err)
@@ -4250,7 +4307,40 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                 status=Status(code=STATUS_BAD_REQUEST, reason=err)
             )
         
-      
+
+        
+
+        tmp_path = []
+        for path in paths:
+            tmp_path.append(str(path))
+
+        paths = {
+            'mode' : path_selection_mode,
+            'paths' : tmp_path
+        }
+
+        storage_helper.create_application_identifier(
+            tenantid=tenantid, deviceid=deviceid,application_name=application_name,
+            description=description, category=category, service_class=service_class,
+            importance=importance, path=paths, rules=tmp_rules
+        )
+
+
+        
+
+        response = self._create_application_traffic_identifier(tenantid=tenantid, deviceid=deviceid, device=device,
+                                                paths=tmp_path, table=table, chain=chain, protocol=protocol,
+                                                source_ip=source_ip, destination_ip=destination_ip,
+                                                source_port=source_port, destination_port=destination_port)
+        
+        return response
+        
+
+    
+
+    def _create_application_traffic_identifier(self, tenantid, deviceid, device, paths, table, chain, protocol, 
+                                                source_ip, destination_ip, source_port, destination_port):
+
         if len(paths) == 1:
             # Add the Traffic identifier rule to route the traffic through the overlay (the overlay over the underlay_wan_id== path[0])
             # Get the table id of the specific overlay
@@ -4287,10 +4377,6 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
             
 
             
-            
-
-
-            
             specific_ip_rules___lowest_priority = storage_helper.decrement_and_get_specific_ip_rules___lowest_priority(deviceid= device["deviceid"], tenantid=tenantid)
 
             # Create ip rule to route the traffic marked with target_value to the overlay
@@ -4314,8 +4400,6 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                 return OverlayServiceReply(
                         status=Status(code=NbStatusCode.STATUS_INTERNAL_SERVER_ERROR, reason=err)
                     )
-
-            
 
         
         elif len(paths) == 2:
@@ -4407,7 +4491,9 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
         return OverlayServiceReply(
             status=Status(code=STATUS_OK, reason='OK')
         )
-    
+
+
+
 
 
     def GetTunnelsTrafficStatistics(self, request, context):
@@ -4503,6 +4589,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
             status=Status(code=STATUS_OK, reason='OK')
         )
         
+
     def StopDelayMonitor(self, request, context):
         success = self.delay_monitor_singleton.stop()
         if not success:
@@ -4516,6 +4603,40 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
         return OverlayServiceReply(
             status=Status(code=STATUS_OK, reason='OK')
         )
+
+
+    # Monitoring System Nb API
+    def StartTrafficAdaptation(self, request, context):
+        
+        success = self.traffic_adaptation_singleton.start()
+        if not success:
+            err = "Cannot start delay monitor"
+            logging.warning(err)
+            return OverlayServiceReply(
+                    status=Status(code=STATUS_INTERNAL_SERVER_ERROR, reason=err)
+                )
+        
+
+        return OverlayServiceReply(
+            status=Status(code=STATUS_OK, reason='OK')
+        )
+    
+
+    def StopTrafficAdaptation(self, request, context):
+        success = self.traffic_adaptation_singleton.stop()
+        if not success:
+            err = "Cannot stop delay monitor"
+            logging.warning(err)
+            return OverlayServiceReply(
+                    status=Status(code=STATUS_INTERNAL_SERVER_ERROR, reason=err)
+                )
+        
+
+        return OverlayServiceReply(
+            status=Status(code=STATUS_OK, reason='OK')
+        )
+   
+    
 
     def StartTrafficMonitor(self, request, context):
         # self.traffic_monitor_singleton.start()
@@ -4574,25 +4695,28 @@ def create_server(grpc_server_ip=DEFAULT_GRPC_SERVER_IP,
         )
 
 
-     # Init the Monitoring system instances
+    # Init the Monitoring system instances
     # Init the delay monitor singleton
     # delay_monitor_singleton = DelayMonitor(srv6_manager=srv6_manager, grpc_client_port=grpc_client_port)
     delay_monitor_singleton = NetworkDelayMonitoring(srv6_manager=srv6_manager, grpc_client_port=grpc_client_port)
+
+    # Init the traffic adaptation singleton
+    traffic_adaptation_singleton = TrafficAdaptation(srv6_manager=srv6_manager, grpc_client_port=grpc_client_port)
 
     # Init the traffic monitor singleton
     traffic_monitor_singleton = TrafficMonitor(srv6_manager=srv6_manager, grpc_client_port=grpc_client_port)
 
 
     # Initialize the Northbound Interface
-
     service = NorthboundInterface(
-        grpc_client_port,
-        srv6_manager,
-        southbound_interface,
-        verbose,
-        stamp_controller,
-        delay_monitor_singleton,
-        traffic_monitor_singleton,
+        grpc_client_port=grpc_client_port,
+        srv6_manager=srv6_manager,
+        southbound_interface=southbound_interface,
+        verbose=verbose,
+        stamp_controller=stamp_controller,
+        delay_monitor_singleton=delay_monitor_singleton,
+        traffic_monitor_singleton=traffic_monitor_singleton,
+        traffic_adaptation_singleton=traffic_adaptation_singleton
     )
     srv6_vpn_pb2_grpc.add_NorthboundInterfaceServicer_to_server(
         service, grpc_server

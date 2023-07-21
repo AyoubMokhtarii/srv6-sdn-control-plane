@@ -401,7 +401,7 @@ class NorthboundInterface:
         return response
 
 
-    def create_application_identifier(self, device_name, tenantid, application_name='', description='', category='', service_class='', importance='', pathss=[], rules={}, match={}):
+    def create_application_identifier(self, device_name, tenantid, application_name='', description='', category='', service_class='', importance='', pathss={}, rules={}, match={}):
 
         # TODO should improve error handling and parameters validation
 
@@ -416,10 +416,35 @@ class NorthboundInterface:
         request.importance = importance
       
 
-        paths = list()
-        for path in pathss:
-            paths.append(str(path))
-        request.paths.extend(paths)
+        # paths = list()
+        # for path in pathss:
+        #     paths.append(str(path))
+        path_mode = pathss['mode']
+        request.paths.mode = path_mode
+
+        # logging.info('path_mode: {}'.format(path_mode))
+        # 11/0
+
+        if path_mode == 'static':
+            paths= list()
+            tmp_paths = pathss['paths']
+            
+            for p in tmp_paths:
+                paths.append(str(p['path_undelayWAN_id']))
+            request.paths.paths.extend(paths)
+
+            
+
+        elif path_mode == 'dynamic':
+            
+            request.paths.policy = pathss['policy']
+            request.paths.delay_threshold = pathss['delay_threshold']
+
+        else:
+            err = 'Invalid path mode: {}'.format(path_mode)
+            response = parse_grpc_error(err, self.server_ip, self.server_port)
+            return response
+        
 
 
  
@@ -522,10 +547,47 @@ class NorthboundInterface:
         return response
     
 
+    def start_traffic_adaptation(self):
+        # Create request
+        request = srv6_vpn_pb2.StartTrafficAdaptationRequest()
 
+        try:
+            # Get the reference of the stub
+            srv6_vpn_stub, channel = self.get_grpc_session(
+                self.server_ip, self.server_port, self.SECURE)
+            
+            response = srv6_vpn_stub.StartTrafficAdaptation(request)
+            # Create the response
+            response = response.status.code, response.status.reason
 
+        except grpc.RpcError as e:
+            response = parse_grpc_error(e, self.server_ip, self.server_port)
+        # Let's close the session
+        channel.close()
+        # Return the response
+        return response
 
+    
+    def stop_traffic_adaptation(self):
+        # Create request
+        request = srv6_vpn_pb2.StopTrafficAdaptationRequest()
 
+        try:
+            # Get the reference of the stub
+            srv6_vpn_stub, channel = self.get_grpc_session(
+                self.server_ip, self.server_port, self.SECURE)
+            
+            response = srv6_vpn_stub.StopTrafficAdaptation(request)
+            # Create the response
+            response = response.status.code, response.status.reason
+
+        except grpc.RpcError as e:
+            response = parse_grpc_error(e, self.server_ip, self.server_port)
+        
+        # Let's close the session
+        channel.close()
+        # Return the response
+        return response
 
 
     def get_topology_information(self):

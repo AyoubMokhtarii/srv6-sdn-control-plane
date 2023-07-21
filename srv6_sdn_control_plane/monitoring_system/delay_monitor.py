@@ -18,7 +18,7 @@ STATUS_OK = NbStatusCode.STATUS_OK
 
 DEFAULT_GRPC_CLIENT_PORT = 12345
 
-DEFAULT_DELAY_MEASUREMENT_INTERVAL = 5 # seconds
+DEFAULT_DELAY_MEASUREMENT_INTERVAL = 0.1 # seconds
 
 
 # class DelayMonitor():
@@ -190,7 +190,7 @@ class NetworkDelayMonitoring:
                  ):
         # FIXME add support for multiple tenants.
         self.tenantid = "1"
-        self.delay_measurement_interval = delay_measurement_interval
+        self.delay_measurement_interval = DEFAULT_DELAY_MEASUREMENT_INTERVAL # FIXME this should take value from init parameters.
         self.srv6_manager = srv6_manager
         self.grpc_client_port = grpc_client_port
 
@@ -232,13 +232,13 @@ class NetworkDelayMonitoring:
 
 
     def _check_device_delay_monitor_thread(self, deviceid):
-      device_measurement_thread = self.measurementThreads.get(deviceid)
-      if device_measurement_thread is not None:
-         if device_measurement_thread.is_alive():
-            # The tread is still alive
-            return True
+        device_measurement_thread = self.measurementThreads.get(deviceid)
+        if device_measurement_thread is not None:
+            if device_measurement_thread.is_alive():
+                # The tread is still alive
+                return True
       
-      return False
+        return False
     
     def _check_device_configuration(self, device):
         # Check if the device is configured and connected and enabled.
@@ -279,7 +279,6 @@ class NetworkDelayMonitoring:
             if response != SbStatusCode.STATUS_SUCCESS:
                 err = "Cannot get device tunnels delay  (device : " + device['name'] + " )"
                 logging.warning(err)
-                200/0
                 continue
 
             else:
@@ -343,4 +342,3 @@ class NetworkDelayMonitoring:
         except KeyboardInterrupt:
             
             self.stop()
-
