@@ -3,22 +3,38 @@ from srv6_sdn_controller_state import (
 )
 
 
-
 import logging
 import threading
 import time
+import sys 
+import os
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import numpy as np
 
 from srv6_sdn_proto.status_codes_pb2 import Status, NbStatusCode, SbStatusCode
-
 from srv6_sdn_proto.srv6_vpn_pb2 import TenantReply, OverlayServiceReply
+
+
+
+from socket import AF_INET
+
+# THIS_FILE_PATH = os.path.abspath(__file__)
+# CONTAINING_FOLDER = os.path.dirname(THIS_FILE_PATH)
+
+sys.path.insert(0, '/home/ayoub/Desktop/_EVERY-WAN_workspace/ew_controller/src/srv6-sdn-control-plane/srv6_sdn_control_plane/monitoring_system/traffic_adaptation/DQN_agent/utils')
+from utils import load_trained_model, DQN
+
+
+
+
 
 # Status codes
 STATUS_OK = NbStatusCode.STATUS_OK
 STATUS_BAD_REQUEST = NbStatusCode.STATUS_BAD_REQUEST
 STATUS_INTERNAL_SERVER_ERROR = NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
-
-from socket import AF_INET
-
 
 
 DEFAULT_GRPC_CLIENT_PORT = 12345
@@ -26,17 +42,23 @@ DEFAULT_GRPC_CLIENT_PORT = 12345
 DEFAULT_ADAPT_INTERVAL = 1 # seconds
 
 
+# if GPU is to be used
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# FIXME : tunnel cost is global for now.
-tunnel_1_cost = 1
-tunnel_2_cost = 2
+
+
 SIZE=6
 td=[None for _ in range(SIZE)]
 MANGLETABLE = "mangle"
 PREROUTINGCHAIN = "PREROUTING"
 
 
-# ======================================================================================================
+
+
+
+
+
+
 
 class TrafficAdaptation:
     """
@@ -46,10 +68,12 @@ class TrafficAdaptation:
 
     _instance = None
 
+
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
+
 
     def __init__(self, 
                  
@@ -57,7 +81,7 @@ class TrafficAdaptation:
                  grpc_client_port=DEFAULT_GRPC_CLIENT_PORT,
                  adapt_frequency=DEFAULT_ADAPT_INTERVAL
                  ):
-        # FIXME add the support for multiple tenants (NB: class is singleton).
+        
         self.tenantid = "1"
         self.adapt_frequency = adapt_frequency
         self.srv6_manager = srv6_manager
@@ -68,6 +92,8 @@ class TrafficAdaptation:
         self._thread = None
         self._stop_event = threading.Event()
         self._running_flag = False
+
+        self._choosen_tunnel = 1
 
 
     def start(self):
@@ -104,11 +130,14 @@ class TrafficAdaptation:
 
         client = storage_helper.get_mongodb_session()
 
-        # FIXME for testing purpose only, get the device 1
         ewED1 = storage_helper.get_device_by_name(name='ewED1', tenantid=tenantid)
         deviceid = ewED1['deviceid']
+
+        tunnels_cost = [1, 2]
+        
+
+        policy_model_net = load_trained_model()
       
-        one_time = False
         while self._running_flag:
             time.sleep(0.1)
 
@@ -116,48 +145,31 @@ class TrafficAdaptation:
 
             threshold, rules = get_app_rules(application_identifiers)
 
+            if threshold is None:
+                logging.error("Application SLA Threshold is None. At least one application with delay Threshold should be defined.")
+                raise Exception()
 
 
-            tunnels_delay_vector, threshold = get_state(client, tenantid, deviceid, threshold)
+
+            state = self.get_state(client, tenantid, deviceid, threshold, tunnels_cost)
+
+            state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
+
+            tunnel_update = policy_model_net(state).max(1)[1].view(1, 1)
+
 
             
-
-            if tunnels_delay_vector is None or threshold is None or tunnels_delay_vector[5] is None:
-                111/0
+            if self._choosen_tunnel != tunnel_update.item():
+                logging.debug("\n\n ===========> changing tunnel ...")
+                logging.debug("old tunnel : %s", self._choosen_tunnel)
+                logging.debug("new tunnel : %s", tunnel_update.item())
                 
 
-
-            # if not one_time:
-            #     logging.info("tunnels_delay_vector")
-            #     logging.info(tunnels_delay_vector)
-
-            #     logging.info("threshold")
-            #     logging.info(threshold)
-
-            # logging.info("type(tunnels_delay_vector[5])")
-            # logging.info(type(tunnels_delay_vector[5]))
+                self._choosen_tunnel = tunnel_update.item()
 
 
-            
-
-            if float(tunnels_delay_vector[5]) >= float(threshold) and not one_time:
-                logging.info("type(threshold)")
-                logging.info(type(threshold))
-
-                logging.info("threshold")
-                logging.info(threshold)
-
-                logging.info("changing tunnel ...")
-
-                tunnel_name = 'vxlan-2'
-                self.change_tunnel(choosentunnel=tunnel_name, tenantid=tenantid, deviceid=deviceid,
+                self.change_tunnel(choosentunnel=self._choosen_tunnel, tenantid=tenantid, deviceid=deviceid,
                                    device=ewED1, table=MANGLETABLE, chain=PREROUTINGCHAIN, rules=rules)
-                
-                one_time = True
-
-            
-
-
 
     
     def _create_application_traffic_identifier(self, tenantid, deviceid, device, paths, table, chain, protocol, 
@@ -183,50 +195,12 @@ class TrafficAdaptation:
             target_value = str(table_id)
 
 
-            logging.info("\n\ntarget_value")
-            logging.info(target_value)
-
-            logging.info("device['mgmtip']")
-            logging.info(device['mgmtip'])
-
-            logging.info("self.grpc_client_port")
-            logging.info(self.grpc_client_port)
-
-            logging.info("table")
-            logging.info(table)
-
-            logging.info("chain")
-            logging.info(chain)
-
-            logging.info("target_name")
-            logging.info(target_name)
-
-            logging.info("target_value")
-            logging.info(target_value)
-
-            logging.info("protocol")
-            logging.info(protocol)
-
-            logging.info("source_ip")
-            logging.info(source_ip)
-
-            logging.info("destination_ip")
-            logging.info(destination_ip)
-
-            logging.info("source_port")
-            logging.info(source_port)
-
-
-
-
             response = self.srv6_manager.create_iptables_rule(device['mgmtip'],self.grpc_client_port,table=table ,
                                                 chain=chain, target_name=target_name,target_value=target_value,
                                                 protocol=protocol, source_ip=source_ip, destination_ip=destination_ip, 
                                                 source_port=source_port, destination_port=destination_port, rule_match = {}
                                                 )
             
-            logging.info("response")
-            logging.info(response)
         
             if response != SbStatusCode.STATUS_SUCCESS:
                 err = "Cannot create iptables rule [1]"
@@ -274,10 +248,11 @@ class TrafficAdaptation:
 
 
     def change_tunnel(self, choosentunnel, tenantid, deviceid, device, table, chain, rules):
-
-    
-        # tunnel_name = 'vxlan-2'
-        tunnel_name=choosentunnel
+        assert type(choosentunnel) == int
+        if choosentunnel == 0 :
+            paths = ['WAN-1']
+        elif choosentunnel == 1 :
+            paths = ['WAN-2']
 
         protocol = rules['protocol']
         source_ip = rules['source_ip']
@@ -285,102 +260,61 @@ class TrafficAdaptation:
         source_port = rules['source_port']
         destination_port = rules['destination_port']
 
-        
-
-
-
-        paths = [get_underlay_wan_id_from_tunnel_name(tunnel_name)]
-
-        # logging.info("protocol")
-        # logging.info(protocol)
-        # logging.info("source_ip")
-        # logging.info(source_ip)
-        # logging.info("destination_ip")
-        # logging.info(destination_ip)
-        # logging.info("source_port")
-        # logging.info(source_port)
-        # logging.info("destination_port")
-        # logging.info(destination_port)
-        # logging.info("paths")
-        # logging.info(paths)
-        # logging.info("table")
-        # logging.info(table)
-        # logging.info("chain")
-        # logging.info(chain)
-
-
-
         self._create_application_traffic_identifier(tenantid=tenantid, deviceid=deviceid, device=device, 
                                         paths=paths, table=table, chain=chain, protocol=protocol, 
                                         source_ip=source_ip, destination_ip=destination_ip, source_port=source_port, destination_port=destination_port)
 
 
+    def get_state(self, client, tenantid, deviceid, threshold, tunnels_cost):
+    
+        tunnels_delay = storage_helper.get_device_delay_history_stats(tenantid=tenantid, deviceid=deviceid, client=client, max_history=3)
+    
+        tunnels_delay_vector = get_tunnels_delay_vector(tunnels_delay)
+    
+        if tunnels_delay_vector is None:
+            logging.error("Cant get current tunnels delay vector. You should start delay monitoring first.")
+            raise Exception()
+        
 
+        current_tunnels_delay_threshold_diff = np.array(tunnels_delay_vector) - threshold
+        current_tunnels_delay_threshold_diff = current_tunnels_delay_threshold_diff.astype(np.float32)
+    
+        tmp_tunnels_cost = np.array(tunnels_cost)
+        max_cost = np.max(tmp_tunnels_cost)
+        normal_tunnels_cost = tmp_tunnels_cost / max_cost
+        normal_tunnels_cost = normal_tunnels_cost.astype(np.float32)
+    
+        choosen_tunnel_float = np.float32([self._choosen_tunnel])
 
-def get_underlay_wan_id_from_tunnel_name(tunnel_name):
-    # FIXME this function is just for testing purpose
-    # this underlay_wan_id should be retrieved from the database
-    return 'WAN-1'
-
-    if tunnel_name == 'vxlan-2':
-        return 'WAN-1'
-    elif tunnel_name == 'vxlan-3':
-        return 'WAN-2'
-    else :
-        return None
-
-
-
-def get_state(client, tenantid, deviceid, threshold):
-
-    tunnels_delay = storage_helper.get_device_delay_history_stats(tenantid=tenantid, deviceid=deviceid, client=client, max_history=3)
-
-    # logging.info('\n\ntunnels_delay')
-    # logging.info(tunnels_delay)
+        state = np.concatenate((choosen_tunnel_float, current_tunnels_delay_threshold_diff, normal_tunnels_cost), axis=0, dtype=np.float32)
+        
+    
+        return state
     
 
-    tunnels_delay_vector = __get_tunnels_delay_vector(tunnels_delay)
-
-    # logging.info("\n\ntunnels_delay_vector")
-    # logging.info(tunnels_delay_vector)
-    
-    
-
-    # logging.info("\n\nthreshold")
-    # logging.info(threshold)
-
-    # if tunnels_delay_vector is not None:
-    #     pass
-
-    return tunnels_delay_vector, threshold
-
-    # logging.info("\n\napplication_identifiers")
-    # logging.info(application_identifiers)
 
 
-
-def __get_tunnels_delay_vector(tunnels_delay):
+def get_tunnels_delay_vector(tunnels_delay):
     td = [None, None, None, None, None, None]
     
-    if tunnels_delay is not None :
-        for t in tunnels_delay:
-            if t['tunnel_name'] == 'vxlan-2':
-                td[0]= t['tunnel_delay_history_stats'][0]
-                td[1]= t['tunnel_delay_history_stats'][-2]
-                td[2]= t['tunnel_delay_history_stats'][-1]
-
-            elif t['tunnel_name'] == 'vxlan-3':
-                td[3]= t['tunnel_delay_history_stats'][-3]
-                td[4]= t['tunnel_delay_history_stats'][-2]
-                td[5]= t['tunnel_delay_history_stats'][-1]
-            else: 
-                # FIXME for test purpose, we use only 2 FIXED tunnels.
-                raise NotImplementedError()
-    else : 
+    if tunnels_delay is None :
         return None
+    
+    for t in tunnels_delay:
+        if t['tunnel_name'] == 'vxlan-2':
+            td[0]= np.float32(t['tunnel_delay_history_stats'][0])
+            td[1]= np.float32(t['tunnel_delay_history_stats'][-2])
+            td[2]= np.float32(t['tunnel_delay_history_stats'][-1])
+        elif t['tunnel_name'] == 'vxlan-3':
+            td[3]= np.float32(t['tunnel_delay_history_stats'][-3])
+            td[4]= np.float32(t['tunnel_delay_history_stats'][-2])
+            td[5]= np.float32(t['tunnel_delay_history_stats'][-1])
+        else: 
+            raise NotImplementedError()
+        
+
     return td
             
-
 
 def get_app_rules(application_identifiers):
     threshold = None
@@ -388,15 +322,13 @@ def get_app_rules(application_identifiers):
     if application_identifiers:
         for application_identifier in application_identifiers:
 
-
-            # logging.info(application_identifier)
-
-
             threshold = application_identifier['path']['delay_threshold']
             rules = application_identifier['rules']
-
-            # FIXME : for testing purpose we are taking only the first appIdentifier
             break
     
 
-    return threshold, rules
+    return np.float32(threshold), rules
+
+
+
+

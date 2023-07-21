@@ -8,6 +8,7 @@ import time
 import json
 import threading
 import logging
+import sys
 from filelock import FileLock
 from argparse import ArgumentParser
 from threading import Thread
@@ -33,6 +34,11 @@ from srv6_sdn_control_plane.northbound.grpc import nb_grpc_server
 from srv6_sdn_controller_state import srv6_sdn_controller_state
 # pymerang dependencies
 from pymerang.pymerang_server import PymerangController
+
+
+
+sys.path.insert(0, '/home/ayoub/Desktop/_EVERY-WAN_workspace/ew_controller/src/srv6-sdn-control-plane/srv6_sdn_control_plane/monitoring_system/traffic_adaptation/DQN_agent/utils')
+from utils import load_trained_model, DQN
 
 # Global variables
 

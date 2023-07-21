@@ -14,8 +14,7 @@ class TrafficMonitor():
         self.grpc_client_port = grpc_client_port
 
     def start(self):
-        pass 
+        raise NotImplementedError 
 
     def stop(self):
-        pass
-
+        raise NotImplementedError 

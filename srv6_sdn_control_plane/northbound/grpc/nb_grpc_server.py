@@ -62,7 +62,7 @@ from srv6_sdn_proto.srv6_vpn_pb2 import GetSIDListsReply
 # from srv6_sdn_control_plane.monitoring_system.delay_monitor import DelayMonitor
 from srv6_sdn_control_plane.monitoring_system.delay_monitor import NetworkDelayMonitoring
 
-from srv6_sdn_control_plane.monitoring_system.traffic_adaptation import TrafficAdaptation
+from srv6_sdn_control_plane.monitoring_system.traffic_adaptation.traffic_adaptation import TrafficAdaptation
 
 from srv6_sdn_control_plane.monitoring_system.traffic_monitor import TrafficMonitor
 
