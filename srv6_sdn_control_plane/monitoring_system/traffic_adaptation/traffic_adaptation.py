@@ -25,7 +25,7 @@ from socket import AF_INET
 # CONTAINING_FOLDER = os.path.dirname(THIS_FILE_PATH)
 
 sys.path.insert(0, '/home/ayoub/Desktop/_EVERY-WAN_workspace/ew_controller/src/srv6-sdn-control-plane/srv6_sdn_control_plane/monitoring_system/traffic_adaptation/DQN_agent/utils')
-from utils import load_trained_model, DQN
+# from utils import load_trained_model, DQN
 
 
 
