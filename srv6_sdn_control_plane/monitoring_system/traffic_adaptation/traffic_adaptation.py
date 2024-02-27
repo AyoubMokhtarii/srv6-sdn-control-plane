@@ -9,9 +9,9 @@ import time
 import sys 
 import os
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
+# import torch
+# import torch.nn as nn
+# import torch.nn.functional as F
 import numpy as np
 
 from srv6_sdn_proto.status_codes_pb2 import Status, NbStatusCode, SbStatusCode
@@ -97,79 +97,83 @@ class TrafficAdaptation:
 
 
     def start(self):
-        success = False
-        if self._thread is None or not self._thread.is_alive():
+        # success = False
+        # if self._thread is None or not self._thread.is_alive():
             
-            self._thread = threading.Thread(
-                    target=self._run_traffic_adaptation_algorithm, 
-                    kwargs={'tenantid': self.tenantid},
-                    daemon=True)
+        #     self._thread = threading.Thread(
+        #             target=self._run_traffic_adaptation_algorithm, 
+        #             kwargs={'tenantid': self.tenantid},
+        #             daemon=True)
             
-            self._running_flag = True
-            self._thread.start()
-            success = True
-        return success
+        #     self._running_flag = True
+        #     self._thread.start()
+        #     success = True
+        # return success
+        logging.debug("NOT Implemented Yet.")
+        return False
 
 
     def stop(self):
-        success = False
+        # success = False
 
-        logging.info("Stopping the traffic adaptation algorithm ...")
+        # logging.info("Stopping the traffic adaptation algorithm ...")
 
-        # if self._thread is not None and self._thread.is_alive():
-        self._running_flag = False
-        self._stop_event.set()
+        # # if self._thread is not None and self._thread.is_alive():
+        # self._running_flag = False
+        # self._stop_event.set()
         
-        success = True
-        return success
+        # success = True
+        # return success
+        logging.debug("NOT Implemented Yet.")
+        return False
     
 
-    def _run_traffic_adaptation_algorithm(self, tenantid):
+    # def _run_traffic_adaptation_algorithm(self, tenantid):
 
-        logging.info("Starting the traffic adaptation algorithm ...")
+    #     logging.info("Starting the traffic adaptation algorithm ...")
 
-        client = storage_helper.get_mongodb_session()
+    #     client = storage_helper.get_mongodb_session()
 
-        ewED1 = storage_helper.get_device_by_name(name='ewED1', tenantid=tenantid)
-        deviceid = ewED1['deviceid']
+    #     ewED1 = storage_helper.get_device_by_name(name='ewED1', tenantid=tenantid)
+    #     deviceid = ewED1['deviceid']
 
-        tunnels_cost = [1, 2]
+    #     tunnels_cost = [1, 2]
         
 
-        policy_model_net = load_trained_model()
+    #     policy_model_net = load_trained_model()
       
-        while self._running_flag:
-            time.sleep(0.1)
+    #     while self._running_flag:
+    #         time.sleep(0.1)
 
-            application_identifiers = storage_helper.get_application_identifiers(client=client,tenantid='1', mode='dynamic')
+    #         application_identifiers = storage_helper.get_application_identifiers(client=client,tenantid='1', mode='dynamic')
 
-            threshold, rules = get_app_rules(application_identifiers)
+    #         threshold, rules = get_app_rules(application_identifiers)
 
-            if threshold is None:
-                logging.error("Application SLA Threshold is None. At least one application with delay Threshold should be defined.")
-                raise Exception()
+    #         if threshold is None:
+    #             logging.error("Application SLA Threshold is None. At least one application with delay Threshold should be defined.")
+    #             raise Exception()
 
 
 
-            state = self.get_state(client, tenantid, deviceid, threshold, tunnels_cost)
+    #         state = self.get_state(client, tenantid, deviceid, threshold, tunnels_cost)
 
-            state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
+    #         state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
 
-            tunnel_update = policy_model_net(state).max(1)[1].view(1, 1)
+    #         tunnel_update = policy_model_net(state).max(1)[1].view(1, 1)
 
 
             
-            if self._choosen_tunnel != tunnel_update.item():
-                logging.debug("\n\n ===========> changing tunnel ...")
-                logging.debug("old tunnel : %s", self._choosen_tunnel)
-                logging.debug("new tunnel : %s", tunnel_update.item())
+    #         if self._choosen_tunnel != tunnel_update.item():
+    #             logging.debug("\n\n ===========> changing tunnel ...")
+    #             logging.debug("old tunnel : %s", self._choosen_tunnel)
+    #             logging.debug("new tunnel : %s", tunnel_update.item())
                 
 
-                self._choosen_tunnel = tunnel_update.item()
+    #             self._choosen_tunnel = tunnel_update.item()
 
 
-                self.change_tunnel(choosentunnel=self._choosen_tunnel, tenantid=tenantid, deviceid=deviceid,
-                                   device=ewED1, table=MANGLETABLE, chain=PREROUTINGCHAIN, rules=rules)
+    #             self.change_tunnel(choosentunnel=self._choosen_tunnel, tenantid=tenantid, deviceid=deviceid,
+    #                                device=ewED1, table=MANGLETABLE, chain=PREROUTINGCHAIN, rules=rules)
 
     
     def _create_application_traffic_identifier(self, tenantid, deviceid, device, paths, table, chain, protocol, 
