@@ -37,8 +37,8 @@ from pymerang.pymerang_server import PymerangController
 
 
 
-sys.path.insert(0, '/home/ayoub/Desktop/_EVERY-WAN_workspace/ew_controller/src/srv6-sdn-control-plane/srv6_sdn_control_plane/monitoring_system/traffic_adaptation/DQN_agent/utils')
-from utils import load_trained_model, DQN
+#sys.path.insert(0, '/home/ayoub/Desktop/_EVERY-WAN_workspace/ew_controller/src/srv6-sdn-control-plane/srv6_sdn_control_plane/monitoring_system/traffic_adaptation/DQN_agent/utils')
+#from utils import load_trained_model, DQN
 
 # Global variables
 
@@ -1419,7 +1419,8 @@ def _main():
         topo_graph = '%s.%s' % (topo_graph, 'svg')
     # Nodes
     nodes = args.nodes
-    nodes = nodes.split(',')
+    if nodes:
+        nodes = nodes.split(',')
     # Get period between two extractions
     period = args.period
     # Verbose mode
