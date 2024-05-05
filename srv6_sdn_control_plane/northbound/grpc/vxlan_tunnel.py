@@ -152,6 +152,8 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
             id_remote_site, tenantid, r_slice['interface_name'])
         lan_sub_local_sites = storage_helper.get_ip_subnets(
             id_local_site, tenantid, l_slice['interface_name'])
+
+        
        
         # get table ID
         tableid = storage_helper.get_tableid(overlayid, tenantid)
@@ -338,11 +340,6 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
             tunnel_remote['fdb_entry_config'] = True
 
 
-        # FIXME remove this just for logging --------------------------------------------------
-        logging.info("\n\n\nwan_intf_local_site: %s", wan_intf_local_site)
-        logging.info("wan_intf_remote_site: %s \n\n\n", wan_intf_remote_site)
-        # time.sleep(100)
-        # FIXME remove this just for logging --------------------------------------------------
 
         
         
@@ -964,16 +961,12 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
         vtep_ip_site = storage_helper.get_new_vtep_ip_unique_2(
             deviceid, tenantid, overlayid, overlay_ip_net_index
         )
+        
+        # FIXME : Need to check ipv4 vtep allocation
+        # vtep_ipv6_site = storage_helper.get_new_vtep_ipv6_unique(
+        #         deviceid, tenantid
+        #     )
 
-        # FIXME remove this just logging -----------------------------------
-        # logging.info("\n\n_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*get_new_vtep_ip_unique*_*_*_*_*_*_*_*_*_*_*_*__*_*_*_*_*_")
-        # logging.info(vtep_ip_site)
-        # logging.info("_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*__*_*_*_*_*_\n\n")
-        # FIXME remove this just logging -----------------------------------
-
-        vtep_ipv6_site = storage_helper.get_new_vtep_ipv6_unique(
-                deviceid, tenantid
-            )
         # Success
         return NbStatusCode.STATUS_OK
 
@@ -1111,6 +1104,13 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
         # get subnet for local and remote site
         subnets = storage_helper.get_ip_subnets(deviceid, tenantid, interface_name)
         
+
+        logging.info("\n\n\n\n\n.....................................................")
+        logging.info("subnets")
+        logging.info(subnets)
+        logging.info("\n\n\n\n\n.....................................................")
+
+
         for subnet in subnets:
             gateway = subnet['gateway']
             subnet = subnet['subnet']
@@ -1125,7 +1125,7 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
                 if response != SbStatusCode.STATUS_SUCCESS:
                     # If the operation has failed, report an error message
                     logger.warning(
-                        'Cannot remove route for %s (gateway %s) in %s ',
+                        '@121 Cannot remove route for %s (gateway %s) in %s ',
                         subnet,
                         gateway,
                         mgmt_ip_site
@@ -1465,6 +1465,474 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
         # Success
         return NbStatusCode.STATUS_OK
 
+
+    def remove_tunnel_2(self, overlayid, overlay_name, overlay_type,
+                          l_slice, r_slice, tenantid, overlay_info,
+                          ignore_errors=False):
+        # get devices ID
+        id_local_site = l_slice['deviceid']
+        id_remote_site = r_slice['deviceid']
+        # get VNI
+        vni = storage_helper.get_vni(
+            overlay_name, tenantid
+        )
+        # get management IP local and remote site
+        mgmt_ip_remote_site = storage_helper.get_router_mgmtip(
+            id_remote_site, tenantid
+        )
+        mgmt_ip_local_site = storage_helper.get_router_mgmtip(
+            id_local_site, tenantid
+        )
+        # get WAN interface name for local site and remote site
+        # TODO TERMIN* Add support for multiple WAN interfaces (hybrid WAN)
+        # wan_intf_local_site = storage_helper.get_wan_interfaces(id_local_site, tenantid)[0]
+        # wan_intf_remote_site = storage_helper.get_wan_interfaces(id_remote_site, tenantid)[0]
+        underlay_wan_id = storage_helper.get_underlay_wan_id(overlayid, tenantid)
+        wan_intf_local_site = storage_helper.get_wan_interface(deviceid=id_local_site, tenantid=tenantid, underlay_wan_id=underlay_wan_id)
+        wan_intf_remote_site = storage_helper.get_wan_interface(deviceid=id_remote_site, tenantid=tenantid, underlay_wan_id=underlay_wan_id)
+        # transport protocol
+        transport_proto = storage_helper.get_overlay(
+            overlayid=overlayid, tenantid=tenantid
+        )['transport_proto']
+        # get external IP address for local site and remote site
+        if transport_proto == 'ipv6':
+            wan_ip_local_site = storage_helper.get_ext_ipv6_addresses(
+                id_local_site, tenantid, wan_intf_local_site
+            )
+            wan_ip_remote_site = storage_helper.get_ext_ipv6_addresses(
+                id_remote_site, tenantid, wan_intf_remote_site
+            )
+        elif transport_proto == 'ipv4':
+            wan_ip_local_site = storage_helper.get_ext_ipv4_addresses(
+                id_local_site, tenantid, wan_intf_local_site
+            )
+            wan_ip_remote_site = storage_helper.get_ext_ipv4_addresses(
+                id_remote_site, tenantid, wan_intf_remote_site
+            )
+        else:
+            return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+
+
+        # get VTEP IP remote site and local site
+        if transport_proto == 'ipv6':
+            vtep_ip_remote_site = storage_helper.get_vtep_ipv6(
+                id_remote_site, tenantid
+            )
+            vtep_ip_local_site = storage_helper.get_vtep_ipv6(
+                id_local_site, tenantid
+            )
+        elif transport_proto == 'ipv4':
+            vtep_ip_remote_site = storage_helper.get_vtep_ip(
+                id_remote_site, tenantid
+            )
+            vtep_ip_local_site = storage_helper.get_vtep_ip(
+                id_local_site, tenantid
+            )
+        else:
+            return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+
+        if wan_ip_local_site is not None and len(wan_ip_local_site) > 0:
+            wan_ip_local_site = wan_ip_local_site[0].split("/")[0]
+        if wan_ip_remote_site is not None and len(wan_ip_remote_site) > 0:
+            wan_ip_remote_site = wan_ip_remote_site[0].split("/")[0]
+        # get local and remote subnet
+        lan_sub_local_sites = storage_helper.get_ip_subnets(
+            id_local_site, tenantid, l_slice['interface_name']
+        )
+        lan_sub_remote_sites = storage_helper.get_ip_subnets(
+            id_remote_site, tenantid, r_slice['interface_name']
+        )
+        # get table ID
+        tableid = storage_helper.get_tableid(
+            overlayid, tenantid
+        )
+        if tableid is None:
+            logger.error(
+                'Error while getting table ID assigned to the overlay %s',
+                overlayid
+            )
+        # get VTEP name
+        vtep_name = 'vxlan-%s' % (vni)
+        # DB key creation, one per tunnel direction
+        key_local_to_remote = '%s-%s' % (id_local_site, id_remote_site)
+        key_remote_to_local = '%s-%s' % (id_remote_site, id_local_site)
+        # get tunnel dictionaries from DB
+        #
+        # local site
+        tunnel_local = self.overlays.find_one(
+            {
+                '_id': ObjectId(overlayid),
+                'tenantid': tenantid,
+                'created_tunnel.tunnel_key': key_local_to_remote
+            },
+            {
+                'created_tunnel.$.tunnel_key': 1
+            }
+        )['created_tunnel'][0]
+        # remote site
+        tunnel_remote = self.overlays.find_one(
+            {
+                '_id': ObjectId(overlayid),
+                'tenantid': tenantid,
+                'created_tunnel.tunnel_key': key_remote_to_local
+            },
+            {
+                'created_tunnel.$.tunnel_key': 1
+            }
+        )['created_tunnel'][0]
+        # Check if there is the fdb entry in remote site for local site
+        if tunnel_remote.get('fdb_entry_config') is True:
+            # Check if there is the route for the
+            # local subnet in the remote device
+            for lan_sub_local_site in lan_sub_local_sites:
+                lan_sub_local_site = lan_sub_local_site['subnet']
+                if lan_sub_local_site in tunnel_remote.get('reach_subnets'):
+                    # remove route in remote site
+                    if storage_helper.is_device_connected(
+                        deviceid=id_remote_site, tenantid=tenantid
+                    ):
+                        response = self.srv6_manager.remove_iproute(
+                            mgmt_ip_remote_site,
+                            self.grpc_client_port,
+                            destination=lan_sub_local_site,
+                            table=tableid
+                        )
+                        if response != SbStatusCode.STATUS_SUCCESS:
+                            # If the operation has failed, report an error
+                            # message
+                            logger.warning(
+                                'Cannot remove route to %s in %s',
+                                lan_sub_local_site,
+                                mgmt_ip_remote_site
+                            )
+                            return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+                    else:
+                        # Change device state to reboot required
+                        success = storage_helper.change_device_state(
+                            deviceid=id_remote_site,
+                            tenantid=tenantid,
+                            new_state=(
+                                storage_helper.DeviceState.REBOOT_REQUIRED
+                            )
+                        )
+                        if success is False or success is None:
+                            logging.error('Error changing the device state')
+                            return NbStatusCode.STATUS_INTERNAL_ERROR
+                    # update local dictionary
+                    tunnel_remote.get('reach_subnets').remove(
+                        lan_sub_local_site
+                    )
+        # Check if the subnet removed is the last subnet
+        # in the considered overlay in the local site
+        if len(tunnel_remote.get('reach_subnets')) == 0:
+            # Check if there is the route for remote subnet in the local site
+            for lan_sub_remote_site in lan_sub_remote_sites:
+                lan_sub_remote_site = lan_sub_remote_site['subnet']
+                if lan_sub_remote_site in tunnel_local.get('reach_subnets'):
+                    # remove route in remote site
+                    if storage_helper.is_device_connected(
+                        deviceid=id_local_site, tenantid=tenantid
+                    ):
+                        # remove route in local site
+                        response = self.srv6_manager.remove_iproute(
+                            mgmt_ip_local_site,
+                            self.grpc_client_port,
+                            destination=lan_sub_remote_site,
+                            table=tableid
+                        )
+                        if response != SbStatusCode.STATUS_SUCCESS:
+                            # If the operation has failed, report an error
+                            # message
+                            logger.warning(
+                                'Cannot remove route to %s in %s',
+                                lan_sub_remote_site,
+                                mgmt_ip_local_site
+                            )
+                            return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+                    else:
+                        # Change device state to reboot required
+                        success = storage_helper.change_device_state(
+                            deviceid=id_local_site,
+                            tenantid=tenantid,
+                            new_state=(
+                                storage_helper.DeviceState.REBOOT_REQUIRED
+                            )
+                        )
+                        if success is False or success is None:
+                            logging.error('Error changing the device state')
+                            return NbStatusCode.STATUS_INTERNAL_ERROR
+                    # update local dictionary
+                    tunnel_local.get('reach_subnets').remove(
+                        lan_sub_remote_site
+                    )
+            # Check if there is the fdb entry in remote site for local site
+            if tunnel_remote.get('fdb_entry_config') is True:
+                # remove route in remote site
+                if storage_helper.is_device_connected(
+                    deviceid=id_remote_site, tenantid=tenantid
+                ):
+                    # remove FDB entry in remote site
+                    response = self.srv6_manager.delfdbentries(
+                        mgmt_ip_remote_site,
+                        self.grpc_client_port,
+                        ifindex=vtep_name,
+                        dst=wan_ip_local_site
+                    )
+                    if response != SbStatusCode.STATUS_SUCCESS:
+                        # If the operation has failed, report an error message
+                        logger.warning(
+                            'Cannot remove FDB entry %s in %s',
+                            wan_ip_local_site,
+                            mgmt_ip_remote_site
+                        )
+                        return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+                else:
+                    # Change device state to reboot required
+                    success = storage_helper.change_device_state(
+                        deviceid=id_remote_site,
+                        tenantid=tenantid,
+                        new_state=(
+                            storage_helper.DeviceState.REBOOT_REQUIRED
+                        )
+                    )
+                    if success is False or success is None:
+                        logging.error('Error changing the device state')
+                        return NbStatusCode.STATUS_INTERNAL_ERROR
+                # update local dictionary
+                tunnel_remote['fdb_entry_config'] = False
+            # Check if there are no more remote subnets
+            # reachable from the local site
+            if len(tunnel_local.get('reach_subnets')) == 0:
+                # Check if there is the fdb entry in local site for remote site
+                if tunnel_local.get('fdb_entry_config') is True:
+                    # remove FDB entry in local site
+                    if storage_helper.is_device_connected(
+                        deviceid=id_local_site, tenantid=tenantid
+                    ):
+                        response = self.srv6_manager.delfdbentries(
+                            mgmt_ip_local_site,
+                            self.grpc_client_port,
+                            ifindex=vtep_name,
+                            dst=wan_ip_remote_site
+                        )
+                        if response != SbStatusCode.STATUS_SUCCESS:
+                            # If the operation has failed, report an error
+                            # message
+                            logger.warning(
+                                'Cannot remove FDB entry %s in %s',
+                                wan_ip_remote_site,
+                                mgmt_ip_local_site
+                            )
+                            return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+                    else:
+                        # Change device state to reboot required
+                        success = storage_helper.change_device_state(
+                            deviceid=id_local_site,
+                            tenantid=tenantid,
+                            new_state=(
+                                storage_helper.DeviceState.REBOOT_REQUIRED
+                            )
+                        )
+                        if success is False or success is None:
+                            logging.error('Error changing the device state')
+                            return NbStatusCode.STATUS_INTERNAL_ERROR
+                    # update local dictionary
+                    tunnel_local['fdb_entry_config'] = False
+
+
+
+        # reverse :
+        #OK      default_ip_rules___lowest_priority_local_site = storage_helper.decrement_and_get_default_ip_rules___lowest_priority(deviceid=local_site_deviceid, tenantid=tenantid)
+        #OK      default_ip_rules___lowest_priority_remote_site = storage_helper.decrement_and_get_default_ip_rules___lowest_priority(deviceid=remote_site_deviceid, tenantid=tenantid)   
+        #OK    remote site : response = self.srv6_manager.create_iprule(
+        #OK    local site : response = self.srv6_manager.create_iprule(
+
+        #OK    local : response = self.srv6_manager.create_iptables_rule(
+        #OK    remote : response = self.srv6_manager.create_iptables_rule(
+
+        #OK    local : success = storage_helper.update_tunnel_mode_interfaces(
+        #OK    remote : success = storage_helper.update_tunnel_mode_interfaces(
+
+
+        # Get the default_iprules_lowest_priority_local_site
+        default_iprules_lowest_priority_local_site = storage_helper.get_default_ip_rules___lowest_priority(
+                                                    deviceid=id_local_site,tenantid=tenantid,)
+        # FIXME Add checking for null default_iprules_lowest_priority_local_site
+
+
+        # Get the default_iprules_lowest_priority_remote_site
+
+        default_iprules_lowest_priority_remote_site = storage_helper.get_default_ip_rules___lowest_priority(
+                                                    deviceid=id_remote_site,tenantid=tenantid,)
+        # FIXME Add checking for null default_iprules_lowest_priority_remote_site
+
+
+
+
+        # remove the ip rule in remote site 
+        response = self.srv6_manager.remove_iprule(
+                mgmt_ip_remote_site,
+                self.grpc_client_port,
+                table=tableid,
+                priority=default_iprules_lowest_priority_remote_site,
+                family=AF_INET)
+        if response != SbStatusCode.STATUS_SUCCESS:
+                logger.warning(
+                    '[remote site] Cannot remove the default ip rule that looksUP for the tunnel table %s in %s',
+                    tableid,
+                    mgmt_ip_remote_site
+                )
+                return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+        # remove the ip rule in local site 
+        response = self.srv6_manager.remove_iprule(
+                mgmt_ip_local_site,
+                self.grpc_client_port,
+                table=tableid,
+                priority=default_iprules_lowest_priority_local_site,
+                family=AF_INET)
+        if response != SbStatusCode.STATUS_SUCCESS:
+                logger.warning(
+                    '[local site] Cannot remove the default ip rule that looksUP for the tunnel table %s in %s',
+                    tableid,
+                    mgmt_ip_local_site
+                )
+                return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+
+
+        # Removing the iptables rules
+        # Remove iptables rule to FORWARD chain in mangle table - local site
+        # Used for counting the traffic going through the tunnel
+        response = self.srv6_manager.remove_iptables_rule(mgmt_ip_local_site, self.grpc_client_port, table= 'mangle',
+                                            chain='FORWARD', target_name='ACCEPT', out_interface=vtep_name)
+        if response != SbStatusCode.STATUS_SUCCESS:
+            err = "Cannot remove iptables rule [local site]"
+            logging.warning(err)
+            return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+
+        # Remove iptables rule to FORWARD chain in mangle table - remote site
+        # Used for counting the traffic going through the tunnel
+        response = self.srv6_manager.remove_iptables_rule(mgmt_ip_remote_site, self.grpc_client_port, table= 'mangle',
+                                            chain='FORWARD', target_name='ACCEPT', out_interface=vtep_name)
+
+        if response != SbStatusCode.STATUS_SUCCESS:
+            err = "Cannot remove iptables rule [remote site]"
+            logging.warning(err)
+            return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+
+
+
+
+        # Update the tunnel_mode virtual interfaces in the local site
+        success = storage_helper.remove_tunnel_mode_interfaces(tenantid=tenantid, deviceid=id_local_site,
+                                            tunnel_mode_name=self.name, tunnel_interface_name=vtep_name ,
+                                            tunnel_dst_endpoint= vtep_ip_remote_site)
+        if not success:
+            err = "Cannot Remove the tunnel_mode virtual interfaces in the local site"
+            logging.warning(err)
+            return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+
+
+
+        # Update the tunnel_mode virtual interfaces in the remote site
+        success = storage_helper.remove_tunnel_mode_interfaces(tenantid=tenantid, deviceid=id_remote_site,
+                                            tunnel_mode_name=self.name, tunnel_interface_name=vtep_name ,
+                                            tunnel_dst_endpoint= vtep_ip_local_site)
+        if not success:
+            err = "Cannot Remove the tunnel_mode virtual interfaces in the remote site"
+            logging.warning(err)
+            return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+
+
+
+
+        # Increment defualt_ip_rules lowest priority in the local site edge device
+        succ = storage_helper.increment_default_ip_rules___lowest_priority(deviceid=id_local_site, tenantid=tenantid)
+        # FIXME add checking for incrementing success.
+
+        # Increment defualt_ip_rules lowest priority in the remote site edge device
+        succ = storage_helper.increment_default_ip_rules___lowest_priority(deviceid=id_remote_site, tenantid=tenantid)
+        # FIXME add checking for incrementing success.
+
+
+
+
+        # If there are no more overlay on the devices
+        # and destroy data structure, else update it
+        if tunnel_local.get('fdb_entry_config') is False and \
+                tunnel_remote.get('fdb_entry_config') is False:
+            # local site
+            self.overlays.update_one(
+                {
+                    '_id': ObjectId(overlayid),
+                    'tenantid': tenantid
+                },
+                {
+                    '$pull': {
+                        'created_tunnel': {
+                            'tunnel_key': tunnel_local.get('tunnel_key')
+                        }
+                    }
+                }
+            )
+            # remote site
+            self.overlays.update_one(
+                {
+                    '_id': ObjectId(overlayid),
+                    'tenantid': tenantid
+                },
+                {
+                    '$pull': {
+                        'created_tunnel': {
+                            'tunnel_key': tunnel_remote.get('tunnel_key')
+                        }
+                    }
+                }
+            )
+        else:
+            # local site
+            self.overlays.update_one(
+                {
+                    '_id': ObjectId(overlayid),
+                    'tenantid': tenantid,
+                    'created_tunnel.tunnel_key': tunnel_local.get('tunnel_key')
+                },
+                {
+                    '$set': {
+                        'created_tunnel.$.reach_subnets': tunnel_local.get(
+                            'reach_subnets'
+                        ),
+                        'created_tunnel.$.fdb_entry_config': tunnel_local.get(
+                            'fdb_entry_config'
+                        )
+                    }
+                }
+            )
+            # remote site
+            self.overlays.update_one(
+                {
+                    '_id': ObjectId(overlayid),
+                    'tenantid': tenantid,
+                    'created_tunnel.tunnel_key': tunnel_remote.get(
+                        'tunnel_key'
+                    )
+                },
+                {
+                    '$set': {
+                        'created_tunnel.$.reach_subnets': tunnel_remote.get(
+                            'reach_subnets'
+                        ),
+                        'created_tunnel.$.fdb_entry_config': tunnel_remote.get(
+                            'fdb_entry_config'
+                        )
+                    }
+                }
+            )
+
+
+
+        # Success
+        return NbStatusCode.STATUS_OK
+
     def destroy_overlay(self, overlayid, overlay_name,
                         overlay_type, tenantid, deviceid, overlay_info,
                         ignore_errors=False):
@@ -1672,6 +2140,19 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
         storage_helper.release_vtep_ipv6(deviceid, tenantid)
         # Success
         return NbStatusCode.STATUS_OK
+
+
+
+    def destroy_tunnel_mode_2(self, deviceid, tenantid, overlay_info, overlayid, ignore_errors=False):
+        # release VTEP IP address on the EDGE device
+        # release vtep_ip4
+        suc = storage_helper.release_vtep_ip_unique_2(dev_id=deviceid, tenantid=tenantid, overlayid=overlayid)
+        # release vtep_ip6
+        # TODO release release_vtep_ipv6_unique
+        # Success
+        return NbStatusCode.STATUS_OK
+
+
 
     def get_overlays(self):
         raise NotImplementedError

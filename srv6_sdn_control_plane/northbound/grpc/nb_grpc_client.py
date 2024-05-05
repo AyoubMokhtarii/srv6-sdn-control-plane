@@ -38,6 +38,11 @@ from srv6_sdn_control_plane.srv6_controller_utils import(
     InterfaceType
 )
 
+import json
+from google.protobuf.json_format import MessageToDict
+from google.protobuf.json_format import MessageToJson
+
+
 # Add path of proto files
 # sys.path.append(srv6_controller_utils.PROTO_FOLDER)
 
@@ -112,7 +117,7 @@ class NorthboundInterface:
                 certificate=certificate
             )
 
-    # Build a grpc stub
+    # Build a grpc stub 
     def get_grpc_session(self, ip_address, port, secure):
         addr_family = srv6_controller_utils.getAddressFamily(ip_address)
         if addr_family == AF_INET6:
@@ -219,8 +224,29 @@ class NorthboundInterface:
 
     def configure_device(self, device_id, tenantid, device_name='',
                          device_description='', interfaces=[]):
+
+
+
+        #FIXE removethis logging
+        #============================================
+        logging.info("\n\n\n\n&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&")
+        logging.info("device_id")
+        logging.info(device_id)
+        logging.info("tenantid")
+        logging.info(tenantid)
+        logging.info("device_name")
+        logging.info(device_name)
+        logging.info("device_description")
+        logging.info(device_description)
+        logging.info("interfaces")
+        logging.info(interfaces)
+        logging.info("\n\n\n\n&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&")
+
+        #============================================
+
+
         # Create the request
-        request = srv6_vpn_pb2.ConfigureDeviceRequest()        
+        request = srv6_vpn_pb2.ConfigureDeviceRequest()         
         device = request.configuration.devices.add()
         device.id = device_id
         device.name = device_name
@@ -290,6 +316,38 @@ class NorthboundInterface:
         # Return the response
         return response
 
+    def get_devices_jsonf(self, devices=[], tenantid=''):
+        # Create the request
+        request = srv6_vpn_pb2.InventoryServiceRequest()
+        request.deviceids.extend(devices)
+        request.tenantid = tenantid
+        try:
+            # Get the reference of the stub
+            srv6_vpn_stub, channel = self.get_grpc_session(
+                self.server_ip, self.server_port, self.SECURE)
+            # Get devices
+            response = srv6_vpn_stub.GetDevices(request)
+            if response.status.code == NbStatusCode.STATUS_OK:
+                # Parse response and retrieve devices information
+                devices = []
+                for device in response.device_information.devices:
+                    # device_dict = MessageToDict(device)
+                    device_json = MessageToJson(device)
+                    devices.append(device_json)
+            else:
+                devices = None
+            # Return
+            response = response.status.code, response.status.reason, devices
+        except grpc.RpcError as e:
+            response = parse_grpc_error(e, self.server_ip, self.server_port)
+            response = response[0], response[1], None
+        finally:
+            # Let's close the session
+            channel.close()
+        # Return the response
+        return response
+
+
     def get_devices(self, devices=[], tenantid=''):
         # Create the request
         request = srv6_vpn_pb2.InventoryServiceRequest()
@@ -312,9 +370,9 @@ class NorthboundInterface:
                     device_connected = None
                     device_configured = None
                     device_enabled = None
-                    loopbackip = None       # TODO?
-                    loopbacknet = None      # TODO?
-                    managementip = None     # TODO?
+                    loopbackip = 'None'       # TODO?
+                    loopbacknet = 'None'      # TODO?
+                    managementip = 'None'     # TODO?
                     interfaces = None
                     if device.id is not None:
                         device_id = text_type(device.id)
@@ -357,39 +415,84 @@ class NorthboundInterface:
                             ifname = intf.name
                             type = intf.type
                             mac_addr = intf.mac_addr
-                            ipv4_addrs = list()
-                            ipv4_addrs = intf.ipv4_addrs
-                            ipv6_addrs = intf.ipv6_addrs
-                            ext_ipv4_addrs = intf.ext_ipv4_addrs
-                            ext_ipv6_addrs = intf.ext_ipv6_addrs
-                            ipv4_subnets = intf.ipv4_subnets
-                            ipv6_subnets = intf.ipv6_subnets
-                            interfaces.append({
-                                'name': ifname,
-                                'mac_addr': mac_addr,
+                            underlay_wan_id = intf.underlay_wan_id
+
+                            ipv4_addrs=list()
+                            if intf.ipv4_addrs is not None :
+                                for ipv4_a in intf.ipv4_addrs:
+                                    ipv4_addrs.append(text_type(ipv4_a))
+
+                            ipv6_addrs=list()
+                            if intf.ipv6_addrs is not None :
+                                for ipv6_a in intf.ipv6_addrs:
+                                    ipv6_addrs.append(text_type(ipv6_a))
+                            
+                            ipv4_subnets=list()
+                            if intf.ipv4_subnets is not None : 
+                                for ipv4_s in intf.ipv4_subnets:
+                                    _subnet_ = ipv4_s.subnet
+                                    _gateway_ = ipv4_s.gateway
+                                    ipv4_subnets.append({
+                                        'subnet': text_type(_subnet_),
+                                        'gateway': text_type(_gateway_),
+                                    })
+
+                            ipv6_subnets=list()
+                            if intf.ipv6_subnets is not None:
+                                for ipv6_s in intf.ipv6_subnets:
+                                    _subnet_ = ipv6_s.subnet
+                                    _gateway_ = ipv6_s.gateway
+                                    ipv6_subnets.append({
+                                        'subnet': text_type(_subnet_),
+                                        'gateway': text_type(_gateway_),
+                                    })
+
+                            ext_ipv4_addrs=list()
+                            if intf.ext_ipv4_addrs is not None :
+                                for ext_ipv4_a in intf.ext_ipv4_addrs:
+                                    ext_ipv4_addrs.append(text_type(ext_ipv4_a))
+
+                            ext_ipv6_addrs=list()
+                            if intf.ext_ipv6_addrs is not None :
+                                for ext_ipv6_a in intf.ext_ipv6_addrs:
+                                    ext_ipv6_addrs.append(text_type(ext_ipv6_a))
+       
+                            intf__data = {
+                                'name': text_type(ifname),
+                                'mac_addr': text_type(mac_addr),
                                 'ipv4_addrs': ipv4_addrs,
                                 'ipv6_addrs': ipv6_addrs,
                                 'ext_ipv4_addrs': ext_ipv4_addrs,
                                 'ext_ipv6_addrs': ext_ipv6_addrs,
                                 'ipv4_subnets': ipv4_subnets,
                                 'ipv6_subnets': ipv6_subnets,
-                                'type': type
-                            })
+                                'type': text_type(type),
+                            }
+
+                            if underlay_wan_id is not None and  underlay_wan_id != "" :
+                                intf__data['underlay_wan_id'] = text_type(underlay_wan_id)
+
+                       
+                            interfaces.append(intf__data)
+
+
                     devices.append({
-                        'device_id': device_id,
-                        'loopbackip': loopbackip,
-                        'loopbacknet': loopbacknet,
-                        'managementip': managementip,
-                        'interfaces': interfaces,
-                        'mgmtip': mgmtip,
-                        'name': device_name,
-                        'description': device_description,
+                        'device_id': text_type(device_id),
+                        'name': text_type(device_name),
+                        'description': text_type(device_description),
+                        'mgmtip': text_type(mgmtip),
                         'connected': device_connected,
                         'configured': device_configured,
-                        'enabled': device_enabled
+                        'enabled': device_enabled,
+                        'interfaces': interfaces,
+                        'loopbackip': text_type(loopbackip),
+                        'loopbacknet': text_type(loopbacknet),
+                        'managementip': text_type(managementip),
                     })
             else:
                 devices = None
+
+            
             # Return
             response = response.status.code, response.status.reason, devices
         except grpc.RpcError as e:
@@ -641,26 +744,37 @@ class NorthboundInterface:
                     type = tunnel.overlay_type
                     tunnel_mode = tunnel.tunnel_mode
                     tenantid = tunnel.tenantid
+                    underlay_wan_id = tunnel.underlay_wan_id
+
                     tunnel_interfaces = list()
                     for interface in tunnel.slices:
                         deviceid = None
                         interface_name = None
+                        device_name = None
+                        
                         if interface.deviceid is not None:
                             deviceid = text_type(interface.deviceid)
+
                         if interface.interface_name is not None:
-                            interface_name = text_type(
-                                interface.interface_name)
+                            interface_name = text_type(interface.interface_name)
+                        
+                        if interface.device_name is not None:
+                            device_name = text_type(interface.device_name)
+                        
                         tunnel_interfaces.append({
+                            'device_name' : device_name,
                             'deviceid': deviceid,
                             'interface_name': interface_name
+
                         })
                     tunnels.append({
                         'id': overlayid,
                         'name': name,
                         'type': type,
-                        'interfaces': tunnel_interfaces,
+                        'underlay_wan_id' : underlay_wan_id,
                         'mode': tunnel_mode,
-                        'tenantid': tenantid
+                        'tenantid': tenantid,
+                        'interfaces': tunnel_interfaces  
                     })
             else:
                 tunnels = None
