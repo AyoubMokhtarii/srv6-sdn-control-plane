@@ -4676,7 +4676,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                                                 source_ip, destination_ip, source_port, destination_port):
 
         if len(paths) == 1:
-            # Add the Traffic identifier rule to route the traffic through the overlay (the overlay over the underlay_wan_id== path[0])
+            # Add the Traffic identifier rule to route the traffic through the overlay (the overlay over the underlay_wan_id== path[0]).
             # Get the table id of the specific overlay.
             underlay_wan_id = paths[0]
             table_id = storage_helper.get_tableid_of_overlay_in_device(tenantid, deviceid, underlay_wan_id)
