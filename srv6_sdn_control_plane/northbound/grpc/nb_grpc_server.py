@@ -56,7 +56,7 @@ from srv6_sdn_control_plane.srv6_controller_utils import (
     InterfaceType
 )
 from srv6_sdn_proto.srv6_vpn_pb2 import TenantReply, OverlayServiceReply
-from srv6_sdn_proto.srv6_vpn_pb2 import InventoryServiceReply
+from srv6_sdn_proto.srv6_vpn_pb2 import InventoryServiceReply 
 from srv6_sdn_proto.srv6_vpn_pb2 import GetSIDListsReply
 
 # from srv6_sdn_control_plane.monitoring_system.delay_monitor import DelayMonitor
@@ -466,16 +466,16 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                     )
                 
                 # Description parameter is mandatory
-                if device_description is None or device_description == '':
-                    err = (
-                        'Invalid configuration for device %s\n'
-                        'Invalid value for the mandatory parameter '
-                        '"description": %s' % (deviceid, device_description)
-                    )
-                    logging.error(err)
-                    return OverlayServiceReply(
-                        status=Status(code=STATUS_BAD_REQUEST, reason=err)
-                    )
+                # if device_description is None or device_description == '':
+                #     err = (
+                #         'Invalid configuration for device %s\n'
+                #         'Invalid value for the mandatory parameter '
+                #         '"description": %s' % (deviceid, device_description)
+                #     )
+                #     logging.error(err)
+                #     return OverlayServiceReply(
+                #         status=Status(code=STATUS_BAD_REQUEST, reason=err)
+                #     )
                 
                 # Validate the device IDs
                 logging.debug('Validating the device ID: %s' % deviceid)
@@ -541,7 +541,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                     # Check if the interface exists
                     if interface.name not in devices[deviceid]['interfaces']:
                         err = (
-                            'Invalid configuration for device %s\n'
+                            'Invalid configuration for device %s\n' 
                             'Interface %s not found on device %s'
                             % (deviceid, interface.name, deviceid)
                         )
@@ -1177,13 +1177,33 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                 interface.ext_ipv6_addrs.extend(ifinfo['ext_ipv6_addrs'])
                 for _subnet in ifinfo['ipv4_subnets']:
                     subnet = interface.ipv4_subnets.add()
-                    subnet.subnet = _subnet['subnet']
-                    subnet.gateway = _subnet['gateway']
+                    #subnet.subnet = _subnet['subnet']
+                    #subnet.gateway = _subnet['gateway']
+                    # if _subnet.get('subnet'):
+                    #     subnet.subnet  = _subnet['subnet']
+                    # if _subnet.get('gateway'):
+                    #     subnet.gateway = _subnet['gateway']
+
+                    subnet.subnet  = _subnet['subnet'] if _subnet.get('subnet') else ''
+                    subnet.gateway = _subnet['gateway'] if _subnet.get('gateway') else ''
+
+
+
                 for _subnet in ifinfo['ipv6_subnets']:
                     subnet = interface.ipv6_subnets.add()
-                    subnet.subnet = _subnet['subnet']
-                    subnet.gateway = _subnet['gateway']
+                    #subnet.subnet = _subnet['subnet']
+                    #subnet.gateway = _subnet['gateway']
+                    # if _subnet.get('subnet'):
+                    #     subnet.subnet  = _subnet['subnet'] 
+                    # if _subnet.get('gateway'):
+                    #     subnet.gateway = _subnet['gateway'] 
+                    subnet.subnet  = _subnet['subnet'] if _subnet.get('subnet') else ''
+                    subnet.gateway = _subnet['gateway'] if _subnet.get('gateway') else ''
+
                 interface.type = ifinfo['type']
+                if ifinfo.get('underlay_wan_id'): 
+                    interface.underlay_wan_id = ifinfo['underlay_wan_id']
+            
             mgmtip = _device.get('mgmtip')
             name = _device.get('name')
             description = _device.get('description')
@@ -1444,6 +1464,15 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                 # Extract the overlay name from the intent
                 overlay_name = intent.overlay_name
 
+                __device_ids = set()
+                # Get slice devices dict 
+                for _slice in intent.slices:
+                    deviceid = _slice.deviceid
+                    __device_ids.add(deviceid)
+                devices_dict = storage_helper.get_devices(
+                    deviceids=__device_ids, return_dict=True
+                )   
+
                 # Extract the interfaces
                 slices = list()
                 _devices = set()
@@ -1456,12 +1485,15 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                     slices.append(
                         {
                             'deviceid': deviceid,
+                            'device_name': devices_dict[deviceid]['name'],
                             'interface_name': lan_interface_name,
                             'underlay_wan_id': underlay_wan_id
+                            
                         }
                     )
                     # Add the device to the devices set
                     _devices.add(deviceid)
+
 
                 # Extract tunnel mode
                 tunnel_name = intent.tunnel_mode
@@ -1706,25 +1738,25 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                         'Cannot create the overlay (the device LAN interface is not found in this device : %s '
                         '(device %s)' % (lan_interface_name, deviceid))
                         err = str(err)
-                        logging.warning(err)
+                        logging.warning(err) 
                         return OverlayServiceReply(status=Status(code=STATUS_BAD_REQUEST, reason=err))
                     
 
                 
 
                     # Check if the slice is already assigned to an overlay
-                    _overlay = storage_helper.get_overlay_containing_slice(_slice, tenantid)
-                    if _overlay is not None:
-                        # Slice already assigned to an overlay
-                        err = (
-                            'Cannot create overlay: the slice %s is '
-                            'already assigned to the overlay %s' %
-                            (_slice, _overlay['_id'])
-                        )
-                        logging.warning(err)
-                        return OverlayServiceReply(
-                            status=Status(code=STATUS_BAD_REQUEST, reason=err)
-                        )
+                    # _overlay = storage_helper.get_overlay_containing_slice(_slice, tenantid)
+                    # if _overlay is not None:
+                    #     # Slice already assigned to an overlay
+                    #     err = (
+                    #         'Cannot create overlay: the slice %s is '
+                    #         'already assigned to the overlay %s' %
+                    #         (_slice, _overlay['_id'])
+                    #     )
+                    #     logging.warning(err)
+                    #     return OverlayServiceReply(
+                    #         status=Status(code=STATUS_BAD_REQUEST, reason=err)
+                    #     )
                     
                     
                     # Check for IP addresses
@@ -1890,7 +1922,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                 can_use_ipv6_addr_for_wan = True
                 can_use_ipv4_addr_for_wan = True
                 
-                
+                # Checking for connectivity of WAN interfaces
                 for _slice in slices:
 
 
@@ -2025,7 +2057,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                 logging.info('All checks passed')
                 # All checks passed
                 #
-                # Save the overlay to the controller state
+                # Save the overlay to the controller state 
                 overlayid = storage_helper.create_overlay(
                     overlay_name,
                     overlay_type,
@@ -2065,6 +2097,8 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                             reason=err
                         )
                     )
+
+                # TODO : Add a rollback action to decrement_overlay_ip_net_index
                 
                 # # FIXME remove this just for logging -----------------------------------
                 # overlay_ip_net_index = storage_helper.get_overlay_ip_net_index(tenantid)
@@ -2330,6 +2364,262 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
 
     """Remove a VPN"""
 
+    # def RemoveOverlay(self, request, context):
+    #     logging.info('RemoveOverlay request received:\n%s', request)
+    #     # Extract the intents from the request message
+    #     for intent in request.intents:
+    #         # Parameters extraction
+    #         #
+    #         # Extract the overlay ID from the intent
+    #         overlayid = intent.overlayid
+    #         # Extract the tenant ID from the intent
+    #         tenantid = intent.tenantid
+    #         # Extract tunnel info
+    #         tunnel_info = intent.tunnel_info
+    #         # Validate the tenant ID
+    #         logging.debug('Validating the tenant ID: %s' % tenantid)
+    #         if not srv6_controller_utils.validate_tenantid(tenantid):
+    #             # If tenant ID is invalid, return an error message
+    #             err = 'Invalid tenant ID: %s' % tenantid
+    #             logging.warning(err)
+    #             return OverlayServiceReply(
+    #                 status=Status(code=STATUS_BAD_REQUEST, reason=err)
+    #             )
+    #         # Check if the tenant is configured
+    #         is_config = storage_helper.is_tenant_configured(
+    #             tenantid
+    #         )
+    #         if is_config is None:
+    #             err = 'Error while checking tenant configuration'
+    #             logging.error(err)
+    #             return TenantReply(
+    #                 status=Status(
+    #                     code=STATUS_INTERNAL_SERVER_ERROR,
+    #                     reason=err
+    #                 )
+    #             )
+    #         elif is_config is False:
+    #             err = (
+    #                 'Cannot remove overlay for a tenant unconfigured'
+    #                 'Tenant not found or error during the '
+    #                 'connection to the db'
+    #             )
+    #             logging.warning(err)
+    #             return TenantReply(
+    #                 status=Status(code=STATUS_BAD_REQUEST, reason=err)
+    #             )
+    #         # Remove VPN
+    #         code, reason = self._RemoveOverlay(
+    #             overlayid, tenantid, tunnel_info
+    #         )
+    #         if code != STATUS_OK:
+    #             return OverlayServiceReply(
+    #                 status=Status(code=code, reason=reason)
+    #             )
+    #     logging.info('All the intents have been processed successfully\n\n')
+    #     # Create the response
+    #     return OverlayServiceReply(
+    #         status=Status(code=STATUS_OK, reason='OK')
+    #     )
+
+    # def _RemoveOverlay(self, overlayid, tenantid, tunnel_info):
+    #     with RollbackContext() as rollback:
+    #         # Parameters validation
+    #         #
+    #         # Let's check if the overlay exists
+    #         logging.debug('Checking the overlay: %s' % overlayid)
+    #         overlays = storage_helper.get_overlays(
+    #             overlayids=[overlayid]
+    #         )
+    #         if overlays is None:
+    #             err = 'Error getting the overlay'
+    #             logging.error(err)
+    #             return STATUS_INTERNAL_SERVER_ERROR, err
+    #         elif len(overlays) == 0:
+    #             # If the overlay does not exist, return an error message
+    #             err = 'The overlay %s does not exist' % overlayid
+    #             logging.warning(err)
+    #             return STATUS_BAD_REQUEST, err
+    #         overlay = overlays[0]
+    #         # Check tenant ID
+    #         if tenantid != overlay['tenantid']:
+    #             # If the overlay does not exist, return an error message
+    #             err = (
+    #                 'The overlay %s does not belong to the tenant %s' %
+    #                 (overlayid, tenantid)
+    #             )
+    #             logging.warning(err)
+    #             return STATUS_BAD_REQUEST, err
+    #         # Get the overlay name
+    #         overlay_name = overlay['name']
+    #         # Get the overlay type
+    #         overlay_type = overlay['type']
+    #         # Get the tunnel mode
+    #         tunnel_name = overlay['tunnel_mode']
+    #         tunnel_mode = self.tunnel_modes[tunnel_name]
+    #         # Get the transport proto
+    #         transport_proto = overlay['transport_proto']
+    #         # Get the slices belonging to the overlay
+    #         slices = overlay['slices']
+    #         # All checks passed
+    #         logging.debug('Check passed')
+    #         # Let's remove the VPN
+    #         devices = [slice['deviceid'] for slice in overlay['slices']]
+    #         configured_slices = slices.copy()
+    #         for site1 in slices:
+    #             deviceid = site1['deviceid']
+    #             interface_name = site1['interface_name']
+    #             # Remove the tunnel between all the pairs of interfaces
+    #             for site2 in configured_slices:
+    #                 if site1['deviceid'] != site2['deviceid']:
+    #                     status_code = tunnel_mode.remove_tunnel(
+    #                         overlayid,
+    #                         overlay_name,
+    #                         overlay_type,
+    #                         site1,
+    #                         site2,
+    #                         tenantid,
+    #                         tunnel_info,
+    #                         ignore_errors=True
+    #                     )
+    #                     if status_code != STATUS_OK:
+    #                         err = (
+    #                             'Cannot create tunnel (overlay %s site1 %s '
+    #                             'site2 %s, tenant %s)' %
+    #                             (overlay_name, site1, site2, tenantid)
+    #                         )
+    #                         logging.warning(err)
+    #                         return status_code, err
+    #             # Mark the site1 as unconfigured
+    #             configured_slices.remove(site1)
+    #             # Remove the interface from the overlay
+    #             status_code = tunnel_mode.remove_slice_from_overlay(
+    #                 overlayid,
+    #                 overlay_name,
+    #                 deviceid,
+    #                 interface_name,
+    #                 tenantid,
+    #                 tunnel_info,
+    #                 ignore_errors=True
+    #             )
+    #             if status_code != STATUS_OK:
+    #                 err = (
+    #                     'Cannot remove slice from overlay (overlay %s, '
+    #                     'device %s, slice %s, tenant %s)' %
+    #                     (overlay_name, deviceid, interface_name, tenantid)
+    #                 )
+    #                 logging.warning(err)
+    #                 return status_code, err
+    #             # Check if the overlay and the tunnel mode
+    #             # has already been deleted on the device
+    #             devices.remove(deviceid)
+    #             if deviceid not in devices:
+    #                 # Destroy overlay on the devices
+    #                 status_code = tunnel_mode.destroy_overlay(
+    #                     overlayid,
+    #                     overlay_name,
+    #                     overlay_type,
+    #                     tenantid,
+    #                     deviceid,
+    #                     tunnel_info,
+    #                     ignore_errors=True
+    #                 )
+    #                 if status_code != STATUS_OK:
+    #                     err = (
+    #                         'Cannot destroy overlay (overlay %s, device %s '
+    #                         'tenant %s)' % (overlay_name, deviceid, tenantid)
+    #                     )
+    #                     logging.warning(err)
+    #                     return status_code, err
+    #             # Destroy tunnel mode on the devices
+    #             counter = storage_helper.dec_and_get_tunnel_mode_counter(
+    #                 tunnel_name, deviceid, tenantid
+    #             )
+    #             if counter == 0:
+    #                 # Add reverse action to the rollback stack
+    #                 rollback.push(
+    #                     func=storage_helper.get_and_inc_tunnel_mode_counter,
+    #                     tunnel_name=tunnel_name,
+    #                     deviceid=deviceid,
+    #                     tenantid=tenantid
+    #                 )
+    #                 status_code = tunnel_mode.destroy_tunnel_mode(
+    #                     deviceid, tenantid, tunnel_info, ignore_errors=True
+    #                 )
+    #                 if status_code != STATUS_OK:
+    #                     err = (
+    #                         'Cannot destroy tunnel mode (device %s, tenant %s)'
+    #                         % (deviceid, tenantid)
+    #                     )
+    #                     logging.warning(err)
+    #                     return status_code, err
+    #                 # Add reverse action to the rollback stack
+    #                 rollback.push(
+    #                     func=tunnel_mode.init_tunnel_mode,
+    #                     deviceid=deviceid,
+    #                     tenantid=tenantid,
+    #                     overlay_info=tunnel_info
+    #                 )
+    #             elif counter is None:
+    #                 err = 'Cannot decrease tunnel mode counter'
+    #                 logging.error(err)
+    #                 return STATUS_INTERNAL_SERVER_ERROR, err
+    #             else:
+    #                 # Success
+    #                 # Add reverse action to the rollback stack
+    #                 rollback.push(
+    #                     func=storage_helper.get_and_inc_tunnel_mode_counter,
+    #                     tunnel_name=tunnel_name,
+    #                     deviceid=deviceid,
+    #                     tenantid=tenantid
+    #                 )
+    #         # Destroy overlay data structure
+    #         status_code = tunnel_mode.destroy_overlay_data(
+    #             overlayid,
+    #             overlay_name,
+    #             tenantid,
+    #             tunnel_info,
+    #             ignore_errors=True
+    #         )
+    #         if status_code != STATUS_OK:
+    #             err = (
+    #                 'Cannot destroy overlay data (overlay %s, tenant %s)' %
+    #                 (overlay_name, tenantid)
+    #             )
+    #             logging.warning(err)
+    #             return status_code, err
+    #         # Add reverse action to the rollback stack
+    #         rollback.push(
+    #             func=tunnel_mode.init_overlay_data,
+    #             overlayid=overlayid,
+    #             overlay_name=overlay_name,
+    #             tenantid=tenantid,
+    #             overlay_info=tunnel_info
+    #         )
+    #         # Delete the overlay
+    #         success = storage_helper.remove_overlay(
+    #             overlayid, tenantid
+    #         )
+    #         if success is None or success is False:
+    #             err = 'Cannot remove the overlay from the controller state'
+    #             logging.error(err)
+    #             return STATUS_INTERNAL_SERVER_ERROR, err
+    #         # Add reverse action to the rollback stack
+    #         rollback.push(
+    #             func=storage_helper.create_overlay,
+    #             name=overlay_name,
+    #             type=overlay_type,
+    #             slices=slices,
+    #             tenantid=tenantid,
+    #             tunnel_mode=tunnel_name,
+    #             transport_proto=transport_proto
+    #         )
+    #         # Success, commit all performed operations
+    #         rollback.commitAll()
+    #     # Create the response
+    #     return STATUS_OK, 'OK'
+
+
     def RemoveOverlay(self, request, context):
         logging.info('RemoveOverlay request received:\n%s', request)
         # Extract the intents from the request message
@@ -2375,7 +2665,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                     status=Status(code=STATUS_BAD_REQUEST, reason=err)
                 )
             # Remove VPN
-            code, reason = self._RemoveOverlay(
+            code, reason = self._RemoveOverlay_2(
                 overlayid, tenantid, tunnel_info
             )
             if code != STATUS_OK:
@@ -2388,7 +2678,9 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
             status=Status(code=STATUS_OK, reason='OK')
         )
 
-    def _RemoveOverlay(self, overlayid, tenantid, tunnel_info):
+    def _RemoveOverlay_2(self, overlayid, tenantid, tunnel_info):
+        # TODO Add rollback action to this fucntion.
+
         with RollbackContext() as rollback:
             # Parameters validation
             #
@@ -2438,7 +2730,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                 # Remove the tunnel between all the pairs of interfaces
                 for site2 in configured_slices:
                     if site1['deviceid'] != site2['deviceid']:
-                        status_code = tunnel_mode.remove_tunnel(
+                        status_code = tunnel_mode.remove_tunnel_2(
                             overlayid,
                             overlay_name,
                             overlay_type,
@@ -2459,7 +2751,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                 # Mark the site1 as unconfigured
                 configured_slices.remove(site1)
                 # Remove the interface from the overlay
-                status_code = tunnel_mode.remove_slice_from_overlay(
+                status_code = tunnel_mode.remove_slice_from_overlay_2_0(
                     overlayid,
                     overlay_name,
                     deviceid,
@@ -2476,12 +2768,19 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                     )
                     logging.warning(err)
                     return status_code, err
+
+                
+                # TODO add checking for success
+                storage_helper.update_device_lan_interfaces_removed_from_overlay(
+                                deviceid=deviceid, tenantid=tenantid, lan_interface_name=interface_name)
+
+
                 # Check if the overlay and the tunnel mode
                 # has already been deleted on the device
                 devices.remove(deviceid)
                 if deviceid not in devices:
                     # Destroy overlay on the devices
-                    status_code = tunnel_mode.destroy_overlay(
+                    status_code = tunnel_mode.destroy_overlay_2_0(
                         overlayid,
                         overlay_name,
                         overlay_type,
@@ -2509,8 +2808,8 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                         deviceid=deviceid,
                         tenantid=tenantid
                     )
-                    status_code = tunnel_mode.destroy_tunnel_mode(
-                        deviceid, tenantid, tunnel_info, ignore_errors=True
+                    status_code = tunnel_mode.destroy_tunnel_mode_2(
+                        deviceid, tenantid, tunnel_info, overlayid, ignore_errors=True
                     )
                     if status_code != STATUS_OK:
                         err = (
@@ -2521,10 +2820,12 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                         return status_code, err
                     # Add reverse action to the rollback stack
                     rollback.push(
-                        func=tunnel_mode.init_tunnel_mode,
+                        func=tunnel_mode.init_tunnel_mode_2_0,
                         deviceid=deviceid,
                         tenantid=tenantid,
-                        overlay_info=tunnel_info
+                        overlay_info=tunnel_info,
+                        overlayid=overlayid
+                        
                     )
                 elif counter is None:
                     err = 'Cannot decrease tunnel mode counter'
@@ -2539,6 +2840,9 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                         deviceid=deviceid,
                         tenantid=tenantid
                     )
+
+
+            
             # Destroy overlay data structure
             status_code = tunnel_mode.destroy_overlay_data(
                 overlayid,
@@ -2562,10 +2866,26 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                 tenantid=tenantid,
                 overlay_info=tunnel_info
             )
+            
+
+            success = storage_helper.decrement_overlay_ip_net_index(tenantid)
+            if not success:
+                err = 'Cannot decrement overlay_ip_net_index'
+                logging.error(err)
+                return OverlayServiceReply(
+                    status=Status(
+                        code=STATUS_INTERNAL_SERVER_ERROR,
+                        reason=err
+                    )
+                )
+            
+            
             # Delete the overlay
             success = storage_helper.remove_overlay(
                 overlayid, tenantid
             )
+
+            
             if success is None or success is False:
                 err = 'Cannot remove the overlay from the controller state'
                 logging.error(err)
@@ -2584,6 +2904,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
             rollback.commitAll()
         # Create the response
         return STATUS_OK, 'OK'
+
 
     """Assign an interface to a VPN"""
 
@@ -3682,6 +4003,13 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
         overlays = storage_helper.get_overlays(
             overlayids=overlayids, tenantid=tenantid
         )
+
+        # logging.info("\n\n\n\n\n\n\n\n\n\n-+_+_+_+_+_+_+_+_+_+_+_+_+_+_+_+_+_+")
+        # logging.info("overlays = storage_helper.get_overlays(")
+        # logging.info(overlays)
+        # logging.info("\n-+_+_+_+_+_+_+_+_+_+_+_+_+_+_+_+_+_+\n\n\n\n\n\n\n\n\n")
+        # 2432/0
+
         if overlays is None:
             err = 'Error getting overlays'
             logging.error(err)
@@ -3701,6 +4029,9 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
             overlay.tenantid = _overlay['tenantid']
             # Set tunnel mode
             overlay.tunnel_mode = _overlay['tunnel_mode']
+            # Set underlay wan id
+            overlay.underlay_wan_id = _overlay['underlay_wan_id']
+            
             # Set slices
             # Iterate on all slices
             for _slice in _overlay['slices']:
@@ -3710,6 +4041,11 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                 __slice.deviceid = _slice['deviceid']
                 # Add interface name
                 __slice.interface_name = _slice['interface_name']
+
+                __slice.underlay_wan_id = _slice['underlay_wan_id']
+
+                __slice.device_name = _slice['device_name']
+
         # Return the overlays list
         logging.debug('Sending response:\n%s' % response)
         response.status.code = STATUS_OK
@@ -4287,13 +4623,11 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                 )
 
             logging.info('All the intents have been processed successfully\n\n')
-            # Create the response
             return OverlayServiceReply(
                 status=Status(code=STATUS_OK, reason='OK')
             )
         else:
             logging.error('Unknown path selection mode %s', path_selection_mode)
-            # Create the response
             return OverlayServiceReply(
                 status=Status(code=STATUS_BAD_REQUEST, reason='Unknown path selection mode')
             )
@@ -4402,88 +4736,91 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                     )
 
         
-        elif len(paths) == 2:
-            # load balancing between the two paths
-            i = 0
-            for path in paths:
-                underlay_wan_id = path
-                table_id = storage_helper.get_tableid_of_overlay_in_device(tenantid, deviceid, underlay_wan_id)
-                # Check if the overlay exists
-                if table_id == None:
-                    err = ('There is no overlay created over the underlay %s in device %s (tenantid %s)',underlay_wan_id, deviceid, tenantid)
-                    logging.warning(err)
-                    return OverlayServiceReply(
-                        status=Status(code=STATUS_BAD_REQUEST, reason=err)
-                )
-                # The target is "MARK" in the mangle table
-                # target value to mark packets with the overlay tableid to route traffic matching the rule to the overlay
-                target_name = "MARK"
-                target_value = str(table_id)
+        # elif len(paths) == 2:
+        #     # load balancing between the two paths
+        #     i = 0
+        #     for path in paths:
+        #         underlay_wan_id = path
+        #         table_id = storage_helper.get_tableid_of_overlay_in_device(tenantid, deviceid, underlay_wan_id)
+        #         # Check if the overlay exists
+        #         if table_id == None:
+        #             err = ('There is no overlay created over the underlay %s in device %s (tenantid %s)',underlay_wan_id, deviceid, tenantid)
+        #             logging.warning(err)
+        #             return OverlayServiceReply(
+        #                 status=Status(code=STATUS_BAD_REQUEST, reason=err)
+        #         )
+        #         # The target is "MARK" in the mangle table
+        #         # target value to mark packets with the overlay tableid to route traffic matching the rule to the overlay
+        #         target_name = "MARK"
+        #         target_value = str(table_id)
 
-                for j in [1,2]:
-                    rule_match = dict()
-                    rule_match = {
-                        'match_name' : "statistic",
-                        'match_attributes': [
-                            {
-                                'attribute_name': "mode",
-                                'attribute_value': "nth"
-                            }, 
-                            {
-                                'attribute_name': "every",
-                                'attribute_value': "4"
-                            }, 
-                            {
-                                'attribute_name': "packet",
-                                'attribute_value': i
-                            }, 
-                        ]
-                    }
+        #         for j in [1,2]:
+        #             rule_match = dict()
+        #             rule_match = {
+        #                 'match_name' : "statistic",
+        #                 'match_attributes': [
+        #                     {
+        #                         'attribute_name': "mode",
+        #                         'attribute_value': "nth"
+        #                     }, 
+        #                     {
+        #                         'attribute_name': "every",
+        #                         'attribute_value': "4"
+        #                     }, 
+        #                     {
+        #                         'attribute_name': "packet",
+        #                         'attribute_value': i
+        #                     }, 
+        #                 ]
+        #             }
 
-                    response = self.srv6_manager.create_iptables_rule(device['mgmtip'],self.grpc_client_port,table=table ,
-                                                chain=chain, target_name=target_name,target_value=target_value,
-                                                protocol=protocol, source_ip=source_ip, destination_ip=destination_ip, 
-                                                source_port=source_port, destination_port=destination_port, rule_match = rule_match
-                                                )
+        #             response = self.srv6_manager.create_iptables_rule(device['mgmtip'],self.grpc_client_port,table=table ,
+        #                                         chain=chain, target_name=target_name,target_value=target_value,
+        #                                         protocol=protocol, source_ip=source_ip, destination_ip=destination_ip, 
+        #                                         source_port=source_port, destination_port=destination_port, rule_match = rule_match
+        #                                         )
                     
-                    if response != SbStatusCode.STATUS_SUCCESS:
-                        err = "Cannot create iptables rule"
-                        logging.warning(err)
-                        return OverlayServiceReply(
-                                status=Status(code=STATUS_INTERNAL_SERVER_ERROR, reason=err)
-                            )
+        #             if response != SbStatusCode.STATUS_SUCCESS:
+        #                 err = "Cannot create iptables rule"
+        #                 logging.warning(err)
+        #                 return OverlayServiceReply(
+        #                         status=Status(code=STATUS_INTERNAL_SERVER_ERROR, reason=err)
+        #                     )
 
                     
-                    i+=1 
+        #             i+=1 
 
 
-                specific_ip_rules___lowest_priority = storage_helper.decrement_and_get_specific_ip_rules___lowest_priority(deviceid= device["deviceid"], tenantid=tenantid)
-                # Create ip rule to route the traffic marked with target_value to the overlay
-                response = self.srv6_manager.create_iprule(
-                    device['mgmtip'],
-                    self.grpc_client_port,
-                    table=target_value,
-                    fwmark=target_value,
-                    priority=specific_ip_rules___lowest_priority,
-                    family=AF_INET
-                    )
+        #         specific_ip_rules___lowest_priority = storage_helper.decrement_and_get_specific_ip_rules___lowest_priority(deviceid= device["deviceid"], tenantid=tenantid)
+        #         # Create ip rule to route the traffic marked with target_value to the overlay
+        #         response = self.srv6_manager.create_iprule(
+        #             device['mgmtip'],
+        #             self.grpc_client_port,
+        #             table=target_value,
+        #             fwmark=target_value,
+        #             priority=specific_ip_rules___lowest_priority,
+        #             family=AF_INET
+        #             )
                 
-                if response != SbStatusCode.STATUS_SUCCESS:
-                    # If the operation has failed, report an error message
-                    err = (
-                        'Cannot Create ip rule to route the traffic marked with target_value to the overlay fwmark %s ; table %s',
-                        target_value,
-                        target_value
-                    )
-                    logging.warning(err)
-                    return OverlayServiceReply(
-                            status=Status(code=NbStatusCode.STATUS_INTERNAL_SERVER_ERROR, reason=err)
-                        )
+        #         if response != SbStatusCode.STATUS_SUCCESS:
+        #             # If the operation has failed, report an error message
+        #             err = (
+        #                 'Cannot Create ip rule to route the traffic marked with target_value to the overlay fwmark %s ; table %s',
+        #                 target_value,
+        #                 target_value
+        #             )
+        #             logging.warning(err)
+        #             return OverlayServiceReply(
+        #                     status=Status(code=NbStatusCode.STATUS_INTERNAL_SERVER_ERROR, reason=err)
+        #                 )
 
+        # else :
+        #     raise NotImplementedError("The implementation of load balancing for more than 2 paths is not implemented yet.")
+        
         else :
-            raise NotImplementedError("The implementation of load balancing for more than 2 paths is not implemented yet.")
+            raise NotImplementedError("The implementation of overlay load balancing is not implemented yet.")
         
-        
+   
 
 
         logging.info('All the intents have been processed successfully\n\n')
