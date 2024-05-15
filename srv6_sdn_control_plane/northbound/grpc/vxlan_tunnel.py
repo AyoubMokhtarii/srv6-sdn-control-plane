@@ -652,9 +652,17 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
         subnets = storage_helper.get_ip_subnets(
             deviceid, tenantid, interface_name
         )
+
+        configured_subnets = storage_helper.get_device_main_table_configured_LAN_subnets(deviceid, tenantid)
         for subnet in subnets:
             gateway = subnet['gateway']
             subnet = subnet['subnet']
+
+            if subnet in configured_subnets:
+                continue
+
+            
+            
             if gateway is not None and gateway != '':
                 response = self.srv6_manager.create_iproute(
                     mgmt_ip_site,
@@ -673,6 +681,8 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
                         mgmt_ip_site
                     )
                     return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+
+                storage_helper.update_device_main_table_configured_LAN_subnets(deviceid, tenantid, subnet)
         # Success
         return NbStatusCode.STATUS_OK
 
@@ -1130,6 +1140,10 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
                             mgmt_ip_site
                         )
                         return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+
+                    succ = storage_helper.remove_device_main_table_configured_LAN_subnets(deviceid, tenantid, subnet)
+                    if not succ:
+                        logging.warning('Cannot remove subnet from main_table_configured_LAN_subnets')
 
         # if device_stats.counters.tunnels.?. counter>=2 dont remove the routes from the main routing table
 

@@ -532,7 +532,7 @@ class NorthboundInterface:
 
         if path_mode == 'static':
             paths= list()
-            paths = pathss['paths']
+            paths = pathss['overlay_paths']
             if len(paths)>= 2:
                 logging.error("Multiple paths not implemented in this version.")
                 raise NotImplementedError
