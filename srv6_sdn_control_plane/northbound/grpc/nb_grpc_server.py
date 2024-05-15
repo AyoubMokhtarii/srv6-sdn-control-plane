@@ -58,6 +58,7 @@ from srv6_sdn_control_plane.srv6_controller_utils import (
 from srv6_sdn_proto.srv6_vpn_pb2 import TenantReply, OverlayServiceReply
 from srv6_sdn_proto.srv6_vpn_pb2 import InventoryServiceReply 
 from srv6_sdn_proto.srv6_vpn_pb2 import GetSIDListsReply
+from srv6_sdn_proto.srv6_vpn_pb2 import GetAppsIdentifiersReply
 
 # from srv6_sdn_control_plane.monitoring_system.delay_monitor import DelayMonitor
 from srv6_sdn_control_plane.monitoring_system.delay_monitor import NetworkDelayMonitoring
@@ -261,7 +262,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
             return OverlayServiceReply(
                 status=Status(code=STATUS_BAD_REQUEST, reason=err)
             )
-        # Remove the tenant
+        # Remove the tenant 
         #
         # Get all the overlays associated to the tenant ID
         overlays = storage_helper.get_overlays(tenantid=tenantid)
@@ -1448,7 +1449,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
 
     
     """Create a VPN from an intent received through the northbound interface"""
-# ----------------------------------------------------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------------------------------------------------
     def CreateOverlay(self, request, context):
         logging.info('CreateOverlay request received:\n%s', request)
         with RollbackContext() as rollback:
@@ -2359,7 +2360,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
             status=Status(code=STATUS_OK, reason='OK')
         )
 
-# ----------------------------------------------------------------------------------------------------------------------
+    # ----------------------------------------------------------------------------------------------------------------------
 
 
     """Remove a VPN"""
@@ -2618,7 +2619,6 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
     #         rollback.commitAll()
     #     # Create the response
     #     return STATUS_OK, 'OK'
-
 
     def RemoveOverlay(self, request, context):
         logging.info('RemoveOverlay request received:\n%s', request)
@@ -3999,7 +3999,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                 )
         # Create the response
         response = OverlayServiceReply()
-        # Build the overlays list
+        # Build the overlays list 
         overlays = storage_helper.get_overlays(
             overlayids=overlayids, tenantid=tenantid
         )
@@ -4543,7 +4543,206 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
         return STATUS_OK
 
 
-    """ Application Identifier """
+    def GetAppsIdentifiers(self, request, context):
+        logging.debug('GetAppsIdentifiers request received')
+        tenantid = request.tenantid
+
+        # Validate the tenant ID
+        if not tenantid:
+            err = 'Tenant ID is required.'
+            logging.error(err)
+            return GetAppsIdentifiersReply(
+                status=Status(code=STATUS_BAD_REQUEST, reason=err)
+            )
+
+        response = GetAppsIdentifiersReply()
+        # Build the application identifiers list
+        apps_identifs = storage_helper.get_application_identifiers(
+            tenantid=tenantid
+        )
+
+        if apps_identifs is None:
+            err = 'Error getting application identifiers.'
+            logging.error(err)
+            return GetAppsIdentifiersReply(
+                status=Status(code=STATUS_INTERNAL_SERVER_ERROR, reason=err)
+            )
+
+        for app_identif_info in apps_identifs:
+            # Add a new application identifier to the list
+            app_identif = response.applications_identifiers.add()
+
+            app_identif.tenantid = app_identif_info["tenantid"]
+            app_identif.application_name = app_identif_info["application_name"]
+            app_identif.app_identifier_id = str(app_identif_info["_id"])
+            
+            app_identif.description = app_identif_info["description"]
+
+            app_identif.service_class = app_identif_info["service_class"]
+            app_identif.importance = app_identif_info["importance"]
+            app_identif.category = app_identif_info["category"]
+            app_identif.device_name = app_identif_info["device_name"]
+
+            if app_identif_info["rules"]:
+                app_identif.rules.source_ip = app_identif_info["rules"]["source_ip"]
+                app_identif.rules.destination_ip = app_identif_info["rules"]["destination_ip"]
+                app_identif.rules.protocol = app_identif_info["rules"]["protocol"]
+                app_identif.rules.source_port = app_identif_info["rules"]["source_port"]
+                app_identif.rules.destination_port = app_identif_info["rules"]["destination_port"]
+
+
+            # Set paths
+            # if app_identif_info["path"]:
+            #     app_identif.paths.mode = app_identif_info["path"]["mode"]
+
+            #     if app_identif_info["path"]["policy"]:
+            #         app_identif.paths.policy = app_identif_info["path"]["policy"]
+
+            #     if app_identif_info["path"]["delay_threshold"]:
+            #         app_identif.paths.delay_threshold = app_identif_info["path"]["delay_threshold"]
+            #     if app_identif_info["path"]["paths"]:
+            #         app_identif.paths.paths.extend(app_identif_info["path"]["paths"])
+                    
+            # path_info = app_identif_info.get("path", {})
+            # app_identif.paths.mode = path_info.get("mode")
+            # app_identif.paths.policy = path_info.get("policy")
+            # app_identif.paths.delay_threshold = path_info.get("delay_threshold")
+            # app_identif.paths.paths.extend(path_info.get("paths", []))
+
+
+            path_info = app_identif_info.get("path" , None)
+            if path_info: 
+                mode = path_info.get("mode" ,None)
+                if mode is not None:
+                    app_identif.paths.mode = mode
+                policy = path_info.get("policy" ,None)
+                if policy is not None:
+                    app_identif.paths.policy = policy
+                delay_threshold = path_info.get("delay_threshold" ,None)
+                if delay_threshold is not None:
+                    app_identif.paths.delay_threshold = delay_threshold
+                paths = path_info.get("paths" ,None)
+                if paths:
+                    app_identif.paths.paths.extend(paths)
+
+            # TODO Add matches to the response 
+            #if app_identif_info["matches"]:
+            
+
+        response.status.code = STATUS_OK
+        response.status.reason = 'OK'
+        logging.debug('Sending response:\n%s' % response)
+        return response
+
+
+
+
+    def RemoveAppsIdentifiers(self, request, context):
+        logging.debug('RemoveAppsIdentifiers request received:\n%s', request)
+
+        tenantid = request.tenantid
+        apps_identifiers_id = request.apps_identifiers_id
+
+        # TODO : Add verifications and validations.
+
+
+        _app_identifier = storage_helper.get_application_identifier(apps_identifiers_id)
+
+        if not _app_identifier:
+            err = "Cannot find application identifier."
+            logging.warning(err)
+            return OverlayServiceReply(
+                    status=Status(code=STATUS_INTERNAL_SERVER_ERROR, reason=err)
+                )
+
+        table = _app_identifier["table"]
+        chain = _app_identifier["chain"]
+        target_name = _app_identifier["target_name"]
+        target_value = _app_identifier["target_value"]
+        rule_priority = _app_identifier["priority"]
+        family = _app_identifier["family"]
+
+
+        rules = _app_identifier["rules"]
+        protocol = rules["protocol"]
+        source_ip = rules["source_ip"]
+        destination_ip = rules["destination_ip"]
+        source_port = rules["source_port"]
+        destination_port = rules["destination_port"]
+        
+        deviceid = _app_identifier["deviceid"]
+        tenantid = _app_identifier["tenantid"]
+
+
+        device = storage_helper.get_device(deviceid=deviceid, tenantid=tenantid)
+        if not device: 
+            err = "Cannot find device."
+            logging.warning(err)
+            return OverlayServiceReply(
+                    status=Status(code=STATUS_INTERNAL_SERVER_ERROR, reason=err)
+                )
+
+        response = self.srv6_manager.remove_iptables_rule(device['mgmtip'],self.grpc_client_port,table=table ,
+                                                chain=chain, target_name=target_name,target_value=target_value,
+                                                protocol=protocol, source_ip=source_ip, destination_ip=destination_ip, 
+                                                source_port=source_port, destination_port=destination_port, rule_match = {}
+                                                )
+      
+        
+        if response != SbStatusCode.STATUS_SUCCESS:
+            err = "Cannot remove iptables rule."
+            logging.warning(err)
+            return OverlayServiceReply(
+                    status=Status(code=STATUS_INTERNAL_SERVER_ERROR, reason=err)
+                )
+            
+         
+            
+
+        # Create ip rule to route the traffic marked with target_value to the overlay
+        response = self.srv6_manager.remove_iprule(
+            device['mgmtip'],
+            self.grpc_client_port,
+            table=target_value,
+            fwmark=target_value,
+            priority=rule_priority,
+            family=family
+            )
+
+       
+            
+        if response != SbStatusCode.STATUS_SUCCESS:
+            # If the operation has failed, report an error message
+            err = (
+                'Cannot remove ip rule used for routing the traffic marked with target_value to the overlay fwmark %s ; table %s',
+                target_value,
+                target_value
+            )
+            logging.warning(err)
+            return OverlayServiceReply(
+                    status=Status(code=NbStatusCode.STATUS_INTERNAL_SERVER_ERROR, reason=err)
+                )
+
+        succ = storage_helper.remove_application_identifier(apps_identifiers_id)
+        
+        if not succ: 
+            err = 'Erro removing ip rule from db.'
+            logging.warning(err)
+            return OverlayServiceReply(
+                    status=Status(code=NbStatusCode.STATUS_INTERNAL_SERVER_ERROR, reason=err)
+                )
+
+        # TODO : Add reverse actions.
+
+        logging.info('All the intents have been processed successfully\n\n')
+        # Create the response
+        return OverlayServiceReply(
+            status=Status(code=STATUS_OK, reason='OK')
+        )
+
+
+
+    # """ Application Identifier """
     def CreateAppIdentifier(self, request, context):
         # TODO This a naive implementation, we should add validations and error handling ect.
 
@@ -4576,7 +4775,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
 
         # Check if the device exists
         if device == None:
-            err = ('There is no device with name %s (tenantid %s)',device_name, tenantid)
+            err = f'There is no device with name <{device_name}> (tenantid <{tenantid}>)'
             logging.warning(err)
             return OverlayServiceReply(
                 status=Status(code=STATUS_BAD_REQUEST, reason=err)
@@ -4606,33 +4805,28 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
 
         # Just save the application identifier in the database, the path selection will be done dynamically by traffic adaptation module.
         elif path_selection_mode == 'dynamic':
-            policy = request.paths.policy
-
-            
-            paths = {
-                'mode' : path_selection_mode,
-                'policy' : policy, 
-                'delay_threshold' : request.paths.delay_threshold,
-            }
-
-
-            storage_helper.create_application_identifier(
-                    tenantid=tenantid, deviceid=deviceid,application_name=application_name,
-                    description=description, category=category, service_class=service_class,
-                    importance=importance, path=paths, rules=tmp_rules
-                )
-
-            logging.info('All the intents have been processed successfully\n\n')
-            return OverlayServiceReply(
-                status=Status(code=STATUS_OK, reason='OK')
-            )
+            raise NotImplementedError("dynamix mode not supported for this version.")
+            # policy = request.paths.policy
+            # paths = {
+            #     'mode' : path_selection_mode,
+            #     'policy' : policy, 
+            #     'delay_threshold' : request.paths.delay_threshold,
+            # }
+            # storage_helper.create_application_identifier(
+            #         tenantid=tenantid, deviceid=deviceid,application_name=application_name,
+            #         description=description, category=category, service_class=service_class,
+            #         importance=importance, path=paths, rules=tmp_rules
+            #     )
+            # logging.info('All the intents have been processed successfully\n\n')
+            # return OverlayServiceReply(
+            #     status=Status(code=STATUS_OK, reason='OK')
+            # )
         else:
             logging.error('Unknown path selection mode %s', path_selection_mode)
             return OverlayServiceReply(
                 status=Status(code=STATUS_BAD_REQUEST, reason='Unknown path selection mode')
             )
-        
-        
+
 
         if paths == None or (len(paths)==0):
             err = ('There is no path defined for the application %s ',application_name)
@@ -4640,46 +4834,51 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
             return OverlayServiceReply(
                 status=Status(code=STATUS_BAD_REQUEST, reason=err)
             )
-        
 
         
+
+        response = self._create_application_traffic_identifier(tenantid=tenantid, deviceid=deviceid, device=device,
+                                                paths=paths, table=table, chain=chain, rules=tmp_rules,
+                                                device_name=device_name,application_name=application_name,
+                                                description=description, category=category, service_class=service_class,
+                                                path_selection_mode=path_selection_mode, importance=importance
+                                                )
+        
+        return response
+    
+
+    def _create_application_traffic_identifier(self, tenantid, deviceid, device, paths, table, chain, rules, device_name, application_name, description, category, service_class, path_selection_mode,importance):
+
+        protocol = rules["protocol"]
+        source_ip = rules["source_ip"]
+        destination_ip = rules["destination_ip"]
+        source_port = rules["source_port"]
+        destination_port = rules["destination_port"]
+
 
         tmp_path = []
         for path in paths:
             tmp_path.append(str(path))
 
-        paths = {
+        
+
+        paths_doc = {
             'mode' : path_selection_mode,
             'paths' : tmp_path
         }
 
-        storage_helper.create_application_identifier(
-            tenantid=tenantid, deviceid=deviceid,application_name=application_name,
-            description=description, category=category, service_class=service_class,
-            importance=importance, path=paths, rules=tmp_rules
-        )
-
-
+        paths=tmp_path
         
-
-        response = self._create_application_traffic_identifier(tenantid=tenantid, deviceid=deviceid, device=device,
-                                                paths=tmp_path, table=table, chain=chain, protocol=protocol,
-                                                source_ip=source_ip, destination_ip=destination_ip,
-                                                source_port=source_port, destination_port=destination_port)
-        
-        return response
-        
-
-    
-
-    def _create_application_traffic_identifier(self, tenantid, deviceid, device, paths, table, chain, protocol, 
-                                                source_ip, destination_ip, source_port, destination_port):
 
         if len(paths) == 1:
             # Add the Traffic identifier rule to route the traffic through the overlay (the overlay over the underlay_wan_id== path[0]).
             # Get the table id of the specific overlay.
-            underlay_wan_id = paths[0]
-            table_id = storage_helper.get_tableid_of_overlay_in_device(tenantid, deviceid, underlay_wan_id)
+            # underlay_wan_id = paths[0]
+            # table_id = storage_helper.get_tableid_of_overlay_in_device(tenantid, deviceid, underlay_wan_id)
+
+            overlay_path = paths[0]
+            table_id = storage_helper.get_overlay_tableid(tenantid=tenantid, overlay_name=overlay_path)
+
             
             # Check if the overlay exists
             if table_id == None:
@@ -4735,102 +4934,25 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                         status=Status(code=NbStatusCode.STATUS_INTERNAL_SERVER_ERROR, reason=err)
                     )
 
-        
-        # elif len(paths) == 2:
-        #     # load balancing between the two paths
-        #     i = 0
-        #     for path in paths:
-        #         underlay_wan_id = path
-        #         table_id = storage_helper.get_tableid_of_overlay_in_device(tenantid, deviceid, underlay_wan_id)
-        #         # Check if the overlay exists
-        #         if table_id == None:
-        #             err = ('There is no overlay created over the underlay %s in device %s (tenantid %s)',underlay_wan_id, deviceid, tenantid)
-        #             logging.warning(err)
-        #             return OverlayServiceReply(
-        #                 status=Status(code=STATUS_BAD_REQUEST, reason=err)
-        #         )
-        #         # The target is "MARK" in the mangle table
-        #         # target value to mark packets with the overlay tableid to route traffic matching the rule to the overlay
-        #         target_name = "MARK"
-        #         target_value = str(table_id)
+            
+            storage_helper.create_application_identifier(
+                tenantid=tenantid, device_name=device_name ,deviceid=deviceid,application_name=application_name,
+                description=description, category=category, service_class=service_class,
+                importance=importance, path=paths_doc, rules=rules,
+                table=table, chain=chain, target_name=target_name,target_value=target_value,
+                priority=specific_ip_rules___lowest_priority, family=AF_INET
+                )
 
-        #         for j in [1,2]:
-        #             rule_match = dict()
-        #             rule_match = {
-        #                 'match_name' : "statistic",
-        #                 'match_attributes': [
-        #                     {
-        #                         'attribute_name': "mode",
-        #                         'attribute_value': "nth"
-        #                     }, 
-        #                     {
-        #                         'attribute_name': "every",
-        #                         'attribute_value': "4"
-        #                     }, 
-        #                     {
-        #                         'attribute_name': "packet",
-        #                         'attribute_value': i
-        #                     }, 
-        #                 ]
-        #             }
-
-        #             response = self.srv6_manager.create_iptables_rule(device['mgmtip'],self.grpc_client_port,table=table ,
-        #                                         chain=chain, target_name=target_name,target_value=target_value,
-        #                                         protocol=protocol, source_ip=source_ip, destination_ip=destination_ip, 
-        #                                         source_port=source_port, destination_port=destination_port, rule_match = rule_match
-        #                                         )
-                    
-        #             if response != SbStatusCode.STATUS_SUCCESS:
-        #                 err = "Cannot create iptables rule"
-        #                 logging.warning(err)
-        #                 return OverlayServiceReply(
-        #                         status=Status(code=STATUS_INTERNAL_SERVER_ERROR, reason=err)
-        #                     )
-
-                    
-        #             i+=1 
-
-
-        #         specific_ip_rules___lowest_priority = storage_helper.decrement_and_get_specific_ip_rules___lowest_priority(deviceid= device["deviceid"], tenantid=tenantid)
-        #         # Create ip rule to route the traffic marked with target_value to the overlay
-        #         response = self.srv6_manager.create_iprule(
-        #             device['mgmtip'],
-        #             self.grpc_client_port,
-        #             table=target_value,
-        #             fwmark=target_value,
-        #             priority=specific_ip_rules___lowest_priority,
-        #             family=AF_INET
-        #             )
-                
-        #         if response != SbStatusCode.STATUS_SUCCESS:
-        #             # If the operation has failed, report an error message
-        #             err = (
-        #                 'Cannot Create ip rule to route the traffic marked with target_value to the overlay fwmark %s ; table %s',
-        #                 target_value,
-        #                 target_value
-        #             )
-        #             logging.warning(err)
-        #             return OverlayServiceReply(
-        #                     status=Status(code=NbStatusCode.STATUS_INTERNAL_SERVER_ERROR, reason=err)
-        #                 )
-
-        # else :
-        #     raise NotImplementedError("The implementation of load balancing for more than 2 paths is not implemented yet.")
-        
+      
         else :
             raise NotImplementedError("The implementation of overlay load balancing is not implemented yet.")
         
-   
-
 
         logging.info('All the intents have been processed successfully\n\n')
         # Create the response
         return OverlayServiceReply(
             status=Status(code=STATUS_OK, reason='OK')
         )
-
-
-
 
 
     def GetTunnelsTrafficStatistics(self, request, context):
@@ -4842,7 +4964,8 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
 
         # Check if the device exists
         if device == None:
-            err = ('There is no device with name %s (tenantid %s)',device_name, tenantid)
+            err = f'There is no device with name <{device_name}> (tenantid <{tenantid}>)'
+
             logging.warning(err)
             return OverlayServiceReply(
                 status=Status(code=STATUS_BAD_REQUEST, reason=err)
@@ -4908,8 +5031,6 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
             status=Status(code=STATUS_OK, reason='OK')
         )
 
-
-
     # Monitoring System Nb API
     def StartDelayMonitor(self, request, context):
         
@@ -4926,7 +5047,6 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
             status=Status(code=STATUS_OK, reason='OK')
         )
         
-
     def StopDelayMonitor(self, request, context):
         success = self.delay_monitor_singleton.stop()
         if not success:
@@ -4940,7 +5060,6 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
         return OverlayServiceReply(
             status=Status(code=STATUS_OK, reason='OK')
         )
-
 
     # Monitoring System Nb API
     def StartTrafficAdaptation(self, request, context):
@@ -4958,7 +5077,6 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
             status=Status(code=STATUS_OK, reason='OK')
         )
     
-
     def StopTrafficAdaptation(self, request, context):
         success = self.traffic_adaptation_singleton.stop()
         if not success:
@@ -4973,8 +5091,6 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
             status=Status(code=STATUS_OK, reason='OK')
         )
    
-    
-
     def StartTrafficMonitor(self, request, context):
         # self.traffic_monitor_singleton.start()
         raise NotImplementedError()

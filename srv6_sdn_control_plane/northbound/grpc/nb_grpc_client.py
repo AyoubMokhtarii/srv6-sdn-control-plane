@@ -348,6 +348,8 @@ class NorthboundInterface:
         return response
 
 
+
+
     def get_devices(self, devices=[], tenantid=''):
         # Create the request
         request = srv6_vpn_pb2.InventoryServiceRequest()
@@ -530,18 +532,17 @@ class NorthboundInterface:
 
         if path_mode == 'static':
             paths= list()
-            tmp_paths = pathss['paths']
-            
-            for p in tmp_paths:
-                paths.append(str(p['path_undelayWAN_id']))
+            paths = pathss['paths']
+            if len(paths)>= 2:
+                logging.error("Multiple paths not implemented in this version.")
+                raise NotImplementedError
             request.paths.paths.extend(paths)
 
-            
-
         elif path_mode == 'dynamic':
-            
-            request.paths.policy = pathss['policy']
-            request.paths.delay_threshold = pathss['delay_threshold']
+            # request.paths.policy = pathss['policy']
+            # request.paths.delay_threshold = pathss['delay_threshold']
+            logging.error("dynamic paths not implemented in this version.")
+            raise NotImplementedError
 
         else:
             err = 'Invalid path mode: {}'.format(path_mode)
@@ -550,9 +551,11 @@ class NorthboundInterface:
         
 
 
- 
 
+        
         request.rules.source_ip = rules['source_ip']
+
+
         request.rules.destination_ip = rules['destination_ip']
         request.rules.protocol = rules['protocol']
         request.rules.source_port = rules['source_port']
@@ -582,6 +585,105 @@ class NorthboundInterface:
         channel.close()
         # Return the response
         return response
+
+
+    def get_applications_identifiers(self, apps_identif_ids=[], tenantid=''):
+        apps_identifs = None
+        request = srv6_vpn_pb2.GetAppsIdentifiersRequest()
+        request.tenantid = tenantid
+        try:
+            # Get the reference of the stub
+            srv6_vpn_stub, channel = self.get_grpc_session(
+                self.server_ip, self.server_port, self.SECURE)
+
+            response = srv6_vpn_stub.GetAppsIdentifiers(request)
+            if not response.status.code == NbStatusCode.STATUS_OK:
+                apps_identifs = None
+                response = response.status.code, response.status.reason, apps_identifs
+                return response
+
+            apps_identifs = []
+            for app_identifier in response.applications_identifiers:
+                paths={
+                        "paths_mode": str(app_identifier.paths.mode),
+                        "paths": [
+                            str(p) for p in app_identifier.paths.paths
+                        ],
+                        "policy": str(app_identifier.paths.policy),
+                        "delay_threshold": float(app_identifier.paths.delay_threshold)
+                    }
+
+                rules={
+                            "source_ip": str(app_identifier.rules.source_ip),
+                            "destination_ip": str(app_identifier.rules.destination_ip),
+                            "protocol": str(app_identifier.rules.protocol),
+                            "source_port": str(app_identifier.rules.source_port),
+                            "destination_port": str(app_identifier.rules.destination_port)
+                        }
+
+                matches={
+                    "match_name": app_identifier.matches.match_name,
+                    "match_attributes": [
+                        {
+                            "attribute_name": match_att.attribute_name,
+                            "attribute_value": match_att.attribute_value
+                        }
+                        for match_att in app_identifier.matches.match_attributes
+                    ]
+                }
+
+        
+
+                app_identif_info = {
+                    "device_name": str(app_identifier.device_name),
+                    "tenantid": str(app_identifier.tenantid),
+                    "id": str(app_identifier.app_identifier_id),
+                    "application_name": str(app_identifier.application_name),
+                    "description": str(app_identifier.description),
+                    "category": str(app_identifier.category),
+                    "service_class": str(app_identifier.service_class),
+                    "importance": str(app_identifier.importance),
+                    "overlay_paths": paths,
+                    "rules":rules,
+                    
+                    "matches": matches
+                }
+                apps_identifs.append(app_identif_info)
+
+            
+            
+            response = response.status.code, response.status.reason, apps_identifs
+        except grpc.RpcError as e:
+            response = parse_grpc_error(e, self.server_ip, self.server_port)
+            response = response[0], response[1], None
+
+        channel.close()
+        return response
+
+    def remove_application_identifier(self, app_identif_id='', tenantid=''):
+        # Create the request
+        request = srv6_vpn_pb2.RemoveAppsIdentifiersRequest()
+
+        # TODO : add validation and verifications.
+
+        request.tenantid = tenantid
+        request.apps_identifiers_id = app_identif_id
+
+        try:
+            # Get the reference of the stub
+            srv6_stub, channel = self.get_grpc_session(
+                self.server_ip, self.server_port, self.SECURE)
+            
+            response = srv6_stub.RemoveAppsIdentifiers(request)
+
+            response = response.status.code, response.status.reason
+        except grpc.RpcError as e:
+            response = parse_grpc_error(e, self.server_ip, self.server_port)
+
+
+        channel.close()
+        return response
+
 
 
     def get_tunnels_traffic_statistics(self, device_name, tenantid):

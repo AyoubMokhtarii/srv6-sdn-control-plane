@@ -204,141 +204,224 @@ class NetworkDelayMonitoring:
     def start(self):
         success = False
         if self._thread is None or not self._thread.is_alive():
-            
             self._thread = threading.Thread(
-                    target=self._run_overlay_network_tunnels_delay_measurements, 
+                    target=self._start_devices_delay_monitoring, 
                     kwargs={'tenantid': self.tenantid},
                     daemon=True)
-            
             self.measurementThreads= {}
-            self._running_flag = True
             self._thread.start()
+            self._running_flag = True
             success = True
         return success
 
     def stop(self):
         success = False
-
         # if self._thread is not None and self._thread.is_alive():
         self._running_flag = False
         self._stop_event.set()
         for thread in self.measurementThreads.values():
             thread.join()
         self.measurementThreads= {}
-
-        
         success = True
         return success
 
 
-    def _check_device_delay_monitor_thread(self, deviceid):
+    def _start_devices_delay_monitoring(self, tenantid):
+        UPDATE_RATE = 10
+        try:
+            # check if new device added each UPDATE_RATE seconds.
+            while self._running_flag:
+                devices={}
+                devices = get_devices(tenantid=tenantid, return_dict=True)
+
+                for dev_id in devices:
+                    _device=devices[dev_id]
+                    if not self._check_device_thread(deviceid=_device["deviceid"]):
+                        thread = threading.Thread(
+                            target=self._measure_device_tunnels_2,
+                            kwargs=({'tenantid': tenantid,'device': _device,}))
+
+                        thread.daemon = True
+                        #Update the mapping 
+                        self.measurementThreads[_device["deviceid"]] = thread
+                        thread.start()
+
+
+
+                time.sleep(UPDATE_RATE)
+
+        except KeyboardInterrupt:
+            self.stop()
+
+    def _check_device_thread(self, deviceid):
         device_measurement_thread = self.measurementThreads.get(deviceid)
         if device_measurement_thread is not None:
             if device_measurement_thread.is_alive():
                 # The tread is still alive
                 return True
-      
         return False
-    
-    def _check_device_configuration(self, device):
-        # Check if the device is configured and connected and enabled.
-        # Check if there is at least one overlay tunnel configured.
-        return device['configured'] and device['connected'] and device['enabled'] \
-            and (len(device['stats']['counters']['tunnels']) > 0)
 
-    
-    def _measure_device_tunnels_delay(self, tenantid, device):
-
-        device_vxlan_tunnels = []
-            
-        # TODO add other overlay tunnel mode (e.g. GRE, SRV6) \
-        # Currently only VXLAN is supported.
-        for device_tunnel in device['stats']['counters']['tunnels']:
-            if device_tunnel['tunnel_mode'] == 'VXLAN':
-                for interf in device_tunnel['tunnel_mode_interfaces']:
-                    tunnel = dict()
-                    tunnel['tunnel_interface_name'] = interf['tunnel_interface_name']
-                    tunnel['tunnel_dst_endpoint'] = interf['tunnel_dst_endpoint'].split('/')[0]   
-                    device_vxlan_tunnels.append(tunnel)
-
-        
-
-
-
-
-
+    def _measure_device_tunnels_2(self, tenantid, device):
+        UPDATE_RATE = 10
+        checking_overlay_updates_counter = 0
         while self._running_flag:
-
-            
-
-            response, stats = self.srv6_manager.get_tunnel_delay(
-                            server_ip=device['mgmtip'],
-                            server_port =self.grpc_client_port,
-                            tunnels =device_vxlan_tunnels
+            device_tunnels=[]
+            if checking_overlay_updates_counter % UPDATE_RATE == 0:
+                overlay_intf_name_map = {}
+                overlays =  storage_helper.get_overlays(tenantid=tenantid)
+                for overlay in overlays :
+                    tunnels_hashes=[]
+                    for created_tunnel in overlay["created_tunnel"]:
+                        # Get only the one direction of an overlay tunnel.
+                        tunnel_key = created_tunnel["tunnel_key"]
+                        tunnel_hash = tunnel_key_hash(tunnel_key) 
+                        key1, key2 = tunnel_key.split('__')
+                        if tunnel_hash in tunnels_hashes:
+                            continue
+                        tunnels_hashes.append(tunnel_hash)
+                        if key1 == device['deviceid']:
+                            device_tunnels.append(
+                                {
+                                    "tunnel_interface_name": created_tunnel["tunnel_interface_name"],
+                                    "tunnel_dst_endpoint": created_tunnel["tunnel_dst_endpoint"].split('/')[0],
+                                }
                             )
-            if response != SbStatusCode.STATUS_SUCCESS:
-                err = "Cannot get device tunnels delay  (device : " + device['name'] + " )"
-                logging.warning(err)
-                continue
+                            overlay_intf_name_map[created_tunnel["tunnel_interface_name"]] = {
+                                "tunnel_intf_name" : created_tunnel["tunnel_interface_name"],
+                                "overlay_id": overlay["_id"], 
+                                "tunnel_key" : tunnel_key
+                            }
+                checking_overlay_updates_counter = 0 
+            if len(device_tunnels)>0:
+                devicename= device["name"]
+                msg = f'Requesting device <{devicename}> tunnels delay.'
+                logging.debug(msg)
+                logging.debug("device_tunnels")
+                logging.debug(device_tunnels)
 
-            else:
-                
 
-                for stat in stats:
-                    storage_helper.insert_delay_to_delayHistoryStats(
-                        tenantid=tenantid,
-                        deviceid=device['deviceid'],
-                        device_name=device['name'],
-                        tunnel_name=stat['tunnel_interface_name'],
-                        instant_tunnel_delay=stat['tunnel_delay']
-                        )
-                    
+                response, stats = self.srv6_manager.get_tunnel_delay(
+                                server_ip=device['mgmtip'],
+                                server_port =self.grpc_client_port,
+                                tunnels=device_tunnels
+                                )
+                if response != SbStatusCode.STATUS_SUCCESS:
+                    err = "Cannot get device tunnels delay  (device : " + device['name'] + " )"
+                    logging.warning(err)
+                    continue
+                else:
+                    for stat in stats:
+                        storage_helper.insert_delay_to_delayHistoryStats_2(
+                            tenantid=tenantid,
+                            deviceid=device['deviceid'],
+                            device_name=device['name'],
+                            tunnel_name=stat['tunnel_interface_name'],
+                            instant_tunnel_delay=stat['tunnel_delay'],
+                            tunnel_dst_endpoint= stat['tunnel_dst_endpoint'],
+                            overlay_id= overlay_intf_name_map[str(stat['tunnel_interface_name'])]["overlay_id"],
+                            tunnel_key= overlay_intf_name_map[str(stat['tunnel_interface_name'])]["tunnel_key"]
+                            )
+
             time.sleep(self.delay_measurement_interval)
+            checking_overlay_updates_counter +=1
         
 
+    # def _check_device_delay_monitor_thread(self, deviceid):
+    #     device_measurement_thread = self.measurementThreads.get(deviceid)
+    #     if device_measurement_thread is not None:
+    #         if device_measurement_thread.is_alive():
+    #             # The tread is still alive
+    #             return True
+      
+    #     return False
 
+    # def _check_device_configuration(self, device):
+    #     # Check if the device is configured and connected and enabled.
+    #     # Check if there is at least one overlay tunnel configured.
+    #     return device['configured'] and device['connected'] and device['enabled'] \
+    #         and (len(device['stats']['counters']['tunnels']) > 0)
+    
+    # def _measure_device_tunnels_delay(self, tenantid, device):
 
+    #     device_vxlan_tunnels = []
+            
+    #     # TODO add other overlay tunnel mode (e.g. GRE, SRV6) \
+    #     # Currently only VXLAN is supported.
+    #     for device_tunnel in device['stats']['counters']['tunnels']:
+    #         if device_tunnel['tunnel_mode'] == 'VXLAN':
+    #             for interf in device_tunnel['tunnel_mode_interfaces']:
+    #                 tunnel = dict()
+    #                 tunnel['tunnel_interface_name'] = interf['tunnel_interface_name']
+    #                 tunnel['tunnel_dst_endpoint'] = interf['tunnel_dst_endpoint'].split('/')[0]   
+    #                 device_vxlan_tunnels.append(tunnel)
 
-    def _run_overlay_network_tunnels_delay_measurements(self, tenantid):
+    #     while self._running_flag:
 
-        # FIXME the devices list not updated in the while loop. 
-        # => Update the devices list or Restart the measurement each time a device is connected.
-        # Get the devices of the tenant.
-        devices = storage_helper.get_devices_by_tenantid(tenantid)
-        configured_devices = []
+    #         response, stats = self.srv6_manager.get_tunnel_delay(
+    #                         server_ip=device['mgmtip'],
+    #                         server_port =self.grpc_client_port,
+    #                         tunnels =device_vxlan_tunnels
+    #                         )
+    #         if response != SbStatusCode.STATUS_SUCCESS:
+    #             err = "Cannot get device tunnels delay  (device : " + device['name'] + " )"
+    #             logging.warning(err)
+    #             continue
 
-        # Get only configured devices.
-        for device in devices:
-            # check if the device is configured and connected and enabled \
-            # and has at least one overlay tunnel configured.
-            if self._check_device_configuration(device):
-                configured_devices.append(device)
+    #         else:
+
+    #             for stat in stats:
+    #                 storage_helper.insert_delay_to_delayHistoryStats(
+    #                     tenantid=tenantid,
+    #                     deviceid=device['deviceid'],
+    #                     device_name=device['name'],
+    #                     tunnel_name=stat['tunnel_interface_name'],
+    #                     instant_tunnel_delay=stat['tunnel_delay']
+    #                     )
+                    
+    #         time.sleep(self.delay_measurement_interval)
+        
+    # def _run_overlay_network_tunnels_delay_measurements(self, tenantid):
+
+    #     # FIXME the devices list not updated in the while loop. 
+    #     # => Update the devices list or Restart the measurement each time a device is connected.
+    #     # Get the devices of the tenant.
+    #     devices = storage_helper.get_devices_by_tenantid(tenantid)
+    #     configured_devices = []
+
+    #     # Get only configured devices.
+    #     for device in devices:
+    #         # check if the device is configured and connected and enabled \
+    #         # and has at least one overlay tunnel configured.
+    #         if self._check_device_configuration(device):
+    #             configured_devices.append(device)
 
             
 
-        try:
-            while self._running_flag:
-                for device in configured_devices:
+    #     try:
+    #         while self._running_flag:
+    #             for device in configured_devices:
                    
-                    # Check if the measurement thread is not running, and start it if not running.
-                    if not self._check_device_delay_monitor_thread(deviceid=device['deviceid']):
+    #                 # Check if the measurement thread is not running, and start it if not running.
+    #                 if not self._check_device_delay_monitor_thread(deviceid=device['deviceid']):
 
-                        thread = threading.Thread(
-                            target=self._measure_device_tunnels_delay,
-                            kwargs=({
-                                'tenantid': tenantid,
-                                'device': device,
+    #                     thread = threading.Thread(
+    #                         target=self._measure_device_tunnels_delay,
+    #                         kwargs=({
+    #                             'tenantid': tenantid,
+    #                             'device': device,
 
-                                    })
-                                )
+    #                                 })
+    #                             )
                         
-                        thread.daemon = True
-                        #Update the mapping 
-                        self.measurementThreads[device['deviceid']] = thread
-                        thread.start()
+    #                     thread.daemon = True
+    #                     #Update the mapping 
+    #                     self.measurementThreads[device['deviceid']] = thread
+    #                     thread.start()
 
-                time.sleep(5)
+    #             time.sleep(5)
 
-        except KeyboardInterrupt:
+    #     except KeyboardInterrupt:
             
-            self.stop()
+    #         self.stop()
+
+
