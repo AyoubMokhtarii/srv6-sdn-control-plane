@@ -118,14 +118,7 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
         id_remote_site = r_slice['deviceid']
         id_local_site = l_slice['deviceid']
 
-        # # FIXME remove logging ------------------------------
-        # logging.info("\n\n\n\nRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR")
-        # logging.info(r_slice)
-        # logging.info(l_slice)
-        # logging.info("RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR\n\n\n\n")
-        # ------------------------------
-
-
+      
         local_site_deviceid = l_slice['deviceid']
         remote_site_deviceid = r_slice['deviceid']
 
@@ -134,17 +127,6 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
         # get management IP address for local and remote site
         mgmt_ip_local_site = storage_helper.get_router_mgmtip(local_site_deviceid, tenantid)
         mgmt_ip_remote_site = storage_helper.get_router_mgmtip(remote_site_deviceid, tenantid)
-
-
-        # # FIXME remove logging ------------------------------
-        # logging.info("\n\n11111111111111111111111111111111")
-        # logging.info("mgmt_ip_local_site")
-        # logging.info(mgmt_ip_local_site)
-        # logging.info("mgmt_ip_remote_site")
-        # logging.info(mgmt_ip_remote_site)
-        # logging.info("11111111111111111111111111111111\n\n")
-        # # ---------------------------------------------------
-
 
 
         # get subnet for local and remote site
@@ -184,17 +166,7 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
             )
         else:
             return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
-        
-
-        # # FIXME remove logging ------------------------------
-        # logging.info("\n\n$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
-        # logging.info("vtep_ip_remote_site")
-        # logging.info(vtep_ip_remote_site)
-        # logging.info("vtep_ip_local_site")
-        # logging.info(vtep_ip_local_site)
-        # logging.info("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n\n")
-        # # ---------------------------------------------------
-
+   
 
         
         # get VNI
@@ -203,12 +175,7 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
         # get VTEP name
         vtep_name = 'vxlan-%s' % (vni)
 
-        logging.info("\n\n=========================================================================\n\n")
-        logging.info("vni: %s", vni)
-        logging.info("vtep_name: %s", vtep_name)
-        logging.info("\n\n=========================================================================\n\n")
-
-
+       
         
         # Check if the r_slice and l_slice are in the same underaly network 
         underlay_wan_id = None
@@ -219,7 +186,6 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
         
 
 
-        # TODO TERMIN* Add support for multiple WAN interfaces (hybrid WAN)
         # get WAN interface name for local site and remote site
         wan_intf_local_site = storage_helper.get_wan_interface(deviceid=id_local_site, tenantid=tenantid, underlay_wan_id=underlay_wan_id)
         wan_intf_remote_site = storage_helper.get_wan_interface(deviceid=id_remote_site, tenantid=tenantid, underlay_wan_id=underlay_wan_id)  
@@ -239,8 +205,8 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
             return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
         
         # DB key creation, one per tunnel direction
-        key_local_to_remote = '%s-%s' % (id_local_site, id_remote_site)
-        key_remote_to_local = '%s-%s' % (id_remote_site, id_local_site)
+        key_local_to_remote = '%s__%s' % (id_local_site, id_remote_site)
+        key_remote_to_local = '%s__%s' % (id_remote_site, id_local_site)
 
 
         # get tunnel dictionaries from DB
@@ -275,8 +241,12 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
             tunnel_local = {
                 'tunnel_key': key_local_to_remote,
                 'reach_subnets': [],
-                'fdb_entry_config': False
+                'fdb_entry_config': False, 
+                'tunnel_interface_name' : vtep_name, 
+                'tunnel_dst_endpoint' : vtep_ip_remote_site
+
             }
+        
         else:
             tunnel_local = dictionary_local['created_tunnel'][0]
         # remote site
@@ -284,7 +254,9 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
             tunnel_remote = {
                 'tunnel_key': key_remote_to_local,
                 'reach_subnets': [],
-                'fdb_entry_config': False
+                'fdb_entry_config': False, 
+                'tunnel_interface_name' : vtep_name,
+                'tunnel_dst_endpoint': vtep_ip_local_site
             }
         else:
             tunnel_remote = dictionary_remote['created_tunnel'][0]
@@ -542,11 +514,17 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
                         'reach_subnets': tunnel_local.get('reach_subnets'),
                         'fdb_entry_config': tunnel_local.get(
                             'fdb_entry_config'
-                        )
+                        ), 
+                        'tunnel_interface_name': tunnel_local.get('tunnel_interface_name'),
+                        'tunnel_dst_endpoint': tunnel_local.get('tunnel_dst_endpoint')
                     }
                 }
             }
         ).matched_count == 1
+
+
+
+
         
         if new_doc_created is False:
             self.overlays.update_one(
@@ -564,7 +542,13 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
                         ),
                         'created_tunnel.$.fdb_entry_config': tunnel_local.get(
                             'fdb_entry_config'
-                        )
+                        ), 
+                        'created_tunnel.$.tunnel_interface_name': tunnel_local.get(
+                            'tunnel_interface_name'
+                        ),'created_tunnel.$.tunnel_dst_endpoint': tunnel_local.get(
+                            'tunnel_dst_endpoint'
+                        ),
+
                     }
                 },
                 upsert=True
@@ -585,7 +569,9 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
                         'reach_subnets': tunnel_remote.get('reach_subnets'),
                         'fdb_entry_config': tunnel_remote.get(
                             'fdb_entry_config'
-                        )
+                        ), 
+                        'tunnel_interface_name': tunnel_remote.get('tunnel_interface_name'),
+                        'tunnel_dst_endpoint': tunnel_remote.get('tunnel_dst_endpoint')
                     }
                 }
             }
@@ -605,7 +591,12 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
                         ),
                         'created_tunnel.$.fdb_entry_config': tunnel_remote.get(
                             'fdb_entry_config'
-                        )
+                        ),
+                        'created_tunnel.$.tunnel_interface_name': tunnel_remote.get(
+                            'tunnel_interface_name'
+                        ),'created_tunnel.$.tunnel_dst_endpoint': tunnel_remote.get(
+                            'tunnel_dst_endpoint'
+                        ),
                     }
                 },
                 upsert=True
@@ -661,9 +652,17 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
         subnets = storage_helper.get_ip_subnets(
             deviceid, tenantid, interface_name
         )
+
+        configured_subnets = storage_helper.get_device_main_table_configured_LAN_subnets(deviceid, tenantid)
         for subnet in subnets:
             gateway = subnet['gateway']
             subnet = subnet['subnet']
+
+            if subnet in configured_subnets:
+                continue
+
+            
+            
             if gateway is not None and gateway != '':
                 response = self.srv6_manager.create_iproute(
                     mgmt_ip_site,
@@ -682,6 +681,8 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
                         mgmt_ip_site
                     )
                     return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+
+                storage_helper.update_device_main_table_configured_LAN_subnets(deviceid, tenantid, subnet)
         # Success
         return NbStatusCode.STATUS_OK
 
@@ -1110,27 +1111,43 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
         logging.info(subnets)
         logging.info("\n\n\n\n\n.....................................................")
 
+        # TODO : change this to get_stats
+        device = storage_helper.get_device(deviceid, tenantid)
+        device_stats = device["stats"]
+        counter=None
+        for tunnel in device_stats["counters"]["tunnels"]:
+            if tunnel.get("tunnel_mode") == "VXLAN":
+                counter=tunnel.get("counter")
 
-        for subnet in subnets:
-            gateway = subnet['gateway']
-            subnet = subnet['subnet']
-            if gateway is not None and gateway != '':
-                response = self.srv6_manager.remove_iproute(
-                    mgmt_ip_site,
-                    self.grpc_client_port,
-                    destination=subnet,
-                    gateway=gateway,
-                    table=main_tableid
-                )
-                if response != SbStatusCode.STATUS_SUCCESS:
-                    # If the operation has failed, report an error message
-                    logger.warning(
-                        '@121 Cannot remove route for %s (gateway %s) in %s ',
-                        subnet,
-                        gateway,
-                        mgmt_ip_site
+        if counter < 2:
+            for subnet in subnets:
+                gateway = subnet['gateway']
+                subnet = subnet['subnet']
+                if gateway is not None and gateway != '':
+                    response = self.srv6_manager.remove_iproute(
+                        mgmt_ip_site,
+                        self.grpc_client_port,
+                        destination=subnet,
+                        gateway=gateway,
+                        table=main_tableid
                     )
-                    return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+                    if response != SbStatusCode.STATUS_SUCCESS:
+                        # If the operation has failed, report an error message
+                        logger.warning(
+                            '@121 Cannot remove route for %s (gateway %s) in %s ',
+                            subnet,
+                            gateway,
+                            mgmt_ip_site
+                        )
+                        return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
+
+                    succ = storage_helper.remove_device_main_table_configured_LAN_subnets(deviceid, tenantid, subnet)
+                    if not succ:
+                        logging.warning('Cannot remove subnet from main_table_configured_LAN_subnets')
+
+        # if device_stats.counters.tunnels.?. counter>=2 dont remove the routes from the main routing table
+
+        
     
         # Success
         return NbStatusCode.STATUS_OK
@@ -1206,8 +1223,8 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
         # get VTEP name
         vtep_name = 'vxlan-%s' % (vni)
         # DB key creation, one per tunnel direction
-        key_local_to_remote = '%s-%s' % (id_local_site, id_remote_site)
-        key_remote_to_local = '%s-%s' % (id_remote_site, id_local_site)
+        key_local_to_remote = '%s__%s' % (id_local_site, id_remote_site)
+        key_remote_to_local = '%s__%s' % (id_remote_site, id_local_site)
         # get tunnel dictionaries from DB
         #
         # local site
@@ -1554,8 +1571,8 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
         # get VTEP name
         vtep_name = 'vxlan-%s' % (vni)
         # DB key creation, one per tunnel direction
-        key_local_to_remote = '%s-%s' % (id_local_site, id_remote_site)
-        key_remote_to_local = '%s-%s' % (id_remote_site, id_local_site)
+        key_local_to_remote = '%s__%s' % (id_local_site, id_remote_site)
+        key_remote_to_local = '%s__%s' % (id_remote_site, id_local_site)
         # get tunnel dictionaries from DB
         #
         # local site
@@ -2286,7 +2303,7 @@ class VXLANTunnel(tunnel_mode.TunnelMode):
         else:
             return NbStatusCode.STATUS_INTERNAL_SERVER_ERROR
         # DB key creation, one per tunnel direction
-        key_local_to_remote = '%s-%s' % (id_local_site, id_remote_site)
+        key_local_to_remote = '%s__%s' % (id_local_site, id_remote_site)
         # get tunnel dictionaries from DB
         dictionary_local = self.overlays.find_one(
             {

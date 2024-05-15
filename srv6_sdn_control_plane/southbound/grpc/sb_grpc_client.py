@@ -655,7 +655,7 @@ class SRv6Manager:
     def remove_iprule(self, server_ip, server_port, family, table=-1,
                       priority=-1, action="", scope=-1,
                       destination="", dst_len=-1, source="",
-                      src_len=-1, in_interface="", out_interface=""):
+                      src_len=-1, in_interface="", out_interface="", fwmark=-1):
         # Create message request
         srv6_request = srv6_manager_pb2.SRv6ManagerRequest()
         # Set the type of the carried entity
@@ -676,6 +676,7 @@ class SRv6Manager:
         rule.src_len = int(src_len)
         rule.in_interface = text_type(in_interface)
         rule.out_interface = text_type(out_interface)
+        rule.fwmark = int(fwmark)
         try:
             # Get the reference of the stub
             srv6_stub, channel = self.get_grpc_session(
