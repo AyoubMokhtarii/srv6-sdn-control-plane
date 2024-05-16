@@ -2321,7 +2321,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                             )
                             if status_code != STATUS_OK:
                                 err = (
-                                    'Cannot create tunnel (overlay %s '
+                                    '1 Cannot create tunnel (overlay %s '
                                     'site1 %s site2 %s, tenant %s)'
                                     % (overlay_name, site1, site2, tenantid)
                                 )
@@ -2742,7 +2742,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                         )
                         if status_code != STATUS_OK:
                             err = (
-                                'Cannot create tunnel (overlay %s site1 %s '
+                                '2 Cannot remove tunnel (overlay %s site1 %s '
                                 'site2 %s, tenant %s)' %
                                 (overlay_name, site1, site2, tenantid)
                             )
@@ -3537,7 +3537,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                             )
                             if status_code != STATUS_OK:
                                 err = (
-                                    'Cannot create tunnel (overlay %s '
+                                    '3 Cannot create tunnel (overlay %s '
                                     'site1 %s site2 %s, tenant %s)'
                                     % (overlay_name, site1, site2, tenantid)
                                 )
@@ -3809,7 +3809,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                             )
                             if status_code != STATUS_OK:
                                 err = (
-                                    'Cannot create tunnel (overlay %s '
+                                    '4 Cannot create tunnel (overlay %s '
                                     'site1 %s site2 %s, tenant %s)'
                                     % (overlay_name, site1, site2, tenantid)
                                 )
@@ -4467,7 +4467,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                             )
                             if status_code != STATUS_OK:
                                 err = (
-                                    'Cannot create tunnel (overlay %s '
+                                    '5 Cannot create tunnel (overlay %s '
                                     'site1 %s site2 %s, tenant %s)'
                                     % (overlay_name, site1, site2, tenantid)
                                 )
@@ -4485,7 +4485,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                             )
                             if status_code != STATUS_OK:
                                 err = (
-                                    'Cannot create tunnel (overlay %s '
+                                    '7 Cannot create tunnel (overlay %s '
                                     'site1 %s site2 %s, tenant %s)'
                                     % (overlay_name, site1, site2, tenantid)
                                 )
@@ -4504,7 +4504,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                             )
                             if status_code != STATUS_OK:
                                 err = (
-                                    'Cannot create tunnel (overlay %s '
+                                    '8 Cannot create tunnel (overlay %s '
                                     'site1 %s site2 %s, tenant %s)'
                                     % (overlay_name, site1, site2, tenantid)
                                 )
@@ -4523,7 +4523,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
                             )
                             if status_code != STATUS_OK:
                                 err = (
-                                    'Cannot create tunnel (overlay %s '
+                                    '9 Cannot create tunnel (overlay %s '
                                     'site1 %s site2 %s, tenant %s)'
                                     % (overlay_name, site1, site2, tenantid)
                                 )
@@ -4882,7 +4882,7 @@ class NorthboundInterface(srv6_vpn_pb2_grpc.NorthboundInterfaceServicer):
             
             # Check if the overlay exists
             if table_id == None:
-                err = ('There is no overlay created over the underlay %s in device %s (tenantid %s)',underlay_wan_id, deviceid, tenantid)
+                err = ('There is no overlay <%s> created in device %s (tenantid %s)',overlay_path, deviceid, tenantid)
                 logging.warning(err)
                 return OverlayServiceReply(
                     status=Status(code=STATUS_BAD_REQUEST, reason=err)
